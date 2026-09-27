@@ -1,0 +1,40 @@
+{
+  "name": "opencode-costs-viewer",
+  "private": true,
+  "version": "1.1.0-beta.1",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite --config vite.config.mock.ts",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "test": "vitest run --exclude 'e2e/**'",
+    "test:e2e": "node e2e/run-playwright.mjs",
+    "test:e2e:signal": "node e2e/signal-cleanup.mjs",
+    "test:release": "node --test scripts/generate-pricing.node-test.mjs",
+    "release:prepare": "node scripts/release-pricing.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "i18next": "^26.4.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-i18next": "^17.0.15",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "happy-dom": "^20.14.5",
+    "sql.js": "^1.14.2",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^5.0.1"
+  }
+}

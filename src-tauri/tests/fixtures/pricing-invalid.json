@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-23T12:00:00Z",
+  "sourceVersion": "invalid-fixture",
+  "rates": [
+    {
+      "provider": "openai",
+      "model": "gpt-invalid",
+      "effectiveFrom": "2026-01-01T00:00:00Z",
+      "input": -1,
+      "output": 2,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "source": "invalid-fixture"
+    }
+  ]
+}

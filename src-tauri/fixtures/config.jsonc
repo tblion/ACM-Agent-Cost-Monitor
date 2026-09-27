@@ -1,0 +1,14 @@
+{
+  // Test comment.
+  "provider": {
+    "llmproxy": {
+      "models": {
+        "openai/gpt-4.1": { "cost": { "input": 2.0, "output": 8.0 } },
+        "vertex_ai/claude-sonnet-4-6": { "cost": { "input": 3.3, "output": 16.5, "cache_read": 0.33 } }
+      }
+    },
+    "openrama": {
+      "models": { "qwen3.8-27b": { /* no cost */ } }
+    }
+  }
+}

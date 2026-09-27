@@ -1,0 +1,78 @@
+.audit-view { display: grid; gap: 16px; padding: 24px 20px 32px; }
+.audit-content:focus { outline: 3px solid var(--accent); outline-offset: -3px; }
+.audit-heading, .audit-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.audit-heading h1 { margin: 4px 0 0; text-align: left; font-size: 24px; }
+.audit-back { padding: 0; border: 0; background: none; color: var(--accent); box-shadow: none; cursor: pointer; }
+.audit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.audit-actions button {
+  min-height: 36px;
+  padding: 0.6em 1.2em;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--control-text);
+  background: var(--control-bg);
+  font: inherit;
+  font-weight: 500;
+  box-shadow: 0 2px 2px rgb(0 0 0 / 20%);
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+.audit-actions button:hover, .audit-actions button:active { border-color: var(--accent); }
+.audit-actions button:active { background: color-mix(in srgb, var(--control-bg) 86%, var(--accent)); }
+.audit-last-updated, .audit-stale, .audit-error, .audit-live-status { margin: 4px 0 0; }
+.audit-live-status { min-height: 1.5em; color: var(--muted); }
+.audit-error { color: var(--error); }
+.audit-stale { padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--radius); color: var(--text); }
+.audit-guide { display: grid; gap: 10px; }
+.audit-guide h2, .audit-guide p { margin: 0; }
+.audit-guide p { line-height: 1.55; }
+.audit-empty { min-height: 180px; display: grid; align-content: center; justify-items: center; text-align: center; }
+.audit-empty h2, .audit-empty p { margin: 0; }
+.audit-section-title, .audit-provenance h2, .audit-messages h2 { margin: 0; font-size: 16px; }
+.audit-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.audit-card { display: grid; gap: 6px; min-width: 0; }
+.audit-card span { color: var(--muted); font-size: 12px; }
+.audit-card strong { overflow-wrap: anywhere; font-size: 18px; }
+.audit-info-tip { position: relative; display: inline-flex; vertical-align: middle; }
+.audit-info-button { display: inline-grid; width: 18px; height: 18px; padding: 0; place-items: center; border: 1px solid currentColor; border-radius: 50%; color: var(--accent); background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.audit-info-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.audit-info-tooltip { position: absolute; z-index: 2; top: calc(100% + 8px); left: 0; width: min(280px, 70vw); padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: var(--panel); box-shadow: 0 4px 14px rgb(0 0 0 / 18%); font-size: 12px; font-weight: 400; line-height: 1.45; }
+.audit-provenance dl, .audit-details dl { display: grid; gap: 8px; margin: 12px 0 0; }
+.audit-provenance dl > div, .audit-details dl > div { display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); gap: 12px; }
+.audit-provenance dt, .audit-details dt { color: var(--muted); }
+.audit-provenance dd, .audit-details dd { margin: 0; overflow-wrap: anywhere; }
+.audit-messages { min-width: 0; }
+.audit-section-heading { align-items: flex-start; margin-bottom: 12px; }
+.audit-filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.audit-filters label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.audit-section-heading select { min-height: 34px; }
+.audit-table-scroll { max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.audit-table-scroll:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.audit-table-scroll-help { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+.audit-table-scroll table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 12px; }
+.audit-table-scroll caption { margin-bottom: 8px; color: var(--muted); text-align: left; }
+.audit-table-scroll th, .audit-table-scroll td { padding: 9px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.audit-table-scroll thead th { color: var(--muted); font-weight: 650; }
+.audit-row-toggle { padding: 0; border: 0; background: none; color: var(--accent); box-shadow: none; cursor: pointer; font: inherit; text-align: left; }
+.audit-details-row td { background: color-mix(in srgb, var(--panel) 86%, var(--accent)); }
+.audit-details h3 { margin: 0; font-size: 14px; }
+.audit-detail-block { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; }
+.audit-detail-block h4 { width: 100%; margin: 0; color: var(--muted); font-size: 12px; }
+.audit-detail-block strong { color: var(--text); }
+.audit-message-anomalies, .audit-message-date { margin: 14px 0 0; }
+.audit-invariant { margin: 0; padding: 10px 12px; border-radius: var(--radius); }
+.audit-invariant span { margin-left: 8px; }
+.audit-invariant-valid { border: 1px solid var(--live); }
+.audit-invariant-invalid { border: 1px solid var(--error); color: var(--text); }
+.audit-invariant-invalid ul { margin: 8px 0 0; }
+
+@media (max-width: 700px) {
+  .audit-view { padding: 18px 16px 24px; }
+  .audit-heading, .audit-section-heading { flex-direction: column; align-items: stretch; }
+  .audit-actions { justify-content: flex-start; }
+  .audit-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audit-filters { justify-content: flex-start; }
+  .audit-filters label { align-items: flex-start; flex-direction: column; }
+  .audit-section-heading select { width: 100%; }
+  .audit-provenance dl > div, .audit-details dl > div { grid-template-columns: 1fr; gap: 2px; }
+}

@@ -1,0 +1,123 @@
+{
+  "settings": {
+    "dbPath": null,
+    "configPath": null,
+    "live": false,
+    "theme": "system",
+    "language": null,
+    "defaultPeriodDays": 30,
+    "customGroups": []
+  },
+  "settingsResponse": {
+    "settings": {
+      "dbPath": null,
+      "configPath": null,
+      "live": false,
+      "theme": "system",
+      "language": null,
+      "defaultPeriodDays": 30,
+      "customGroups": []
+    },
+    "diagnostic": null,
+    "liveActive": false
+  },
+  "sessionRecord": [
+    {
+      "id": "session-1",
+      "project": "project",
+      "title": "Example",
+      "date": 1760000000000,
+      "cost": 1.25,
+      "tokens": {
+        "input": 10,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "isSubagent": false,
+      "parentId": null,
+      "source": "configured",
+      "models": [
+        {
+          "provider": "provider",
+          "model": "model",
+          "cost": 1.25,
+          "tokens": {
+            "input": 10,
+            "output": 20,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 0
+          },
+          "source": "stored"
+        }
+      ]
+    }
+  ],
+  "rateEntry": {
+    "provider": "provider",
+    "model": "model",
+    "input": 1,
+    "output": 2,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "source": "catalog",
+    "effectiveFrom": null
+  },
+  "auditReport": {
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "valid": false,
+    "provenance": {
+      "databasePath": "db",
+      "configPath": "config",
+      "catalogPath": "catalog",
+      "catalogVersion": 1,
+      "catalogSourceVersion": "test",
+      "catalogGeneratedAt": "2026-01-01T00:00:00Z",
+      "catalogRateCount": 1
+    },
+    "summary": {
+      "allSessions": 1,
+      "totalMessages": 1,
+      "sessionsWithAssistant": 1,
+      "assistantMessages": 1,
+      "ignoredMessages": 0,
+      "recalculableMessages": 0,
+      "customRateMessages": 0,
+      "catalogRateMessages": 0,
+      "storedFallbackMessages": 1,
+      "missingTokenMessages": 1,
+      "missingDateMessages": 1,
+      "missingRateMessages": 0,
+      "storedCostTotal": 1,
+      "calculatedCostTotal": 0,
+      "selectedCostTotal": 1,
+      "tokens": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "reasoning": 0},
+      "anomalyCounts": {"missingTokens": 1, "missingDate": 1, "missingRate": 0, "invalidRate": 0, "storedCostFallback": 1}
+    },
+    "messages": [
+      {
+        "messageId": "message-1",
+        "sessionId": "session-1",
+        "project": "project",
+        "provider": "provider",
+        "model": "model",
+        "messageDate": null,
+        "tokens": null,
+        "storedCost": 1,
+        "calculatedCost": null,
+        "selectedCost": 1,
+        "costSource": "stored",
+        "rateSource": "catalog",
+        "effectiveFrom": null,
+        "rate": null,
+        "breakdown": null,
+        "anomalies": ["missingDate", "storedCostFallback"]
+      }
+    ],
+    "ignored": [],
+    "sessions": [],
+    "invariants": {"valid": true, "failed": []}
+  }
+}

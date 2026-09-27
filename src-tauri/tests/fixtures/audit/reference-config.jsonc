@@ -1,0 +1,17 @@
+{
+  "provider": {
+    // Fixed custom rate to verify catalog priority.
+    "fixture-custom": {
+      "models": {
+        "fixture-model": {
+          "cost": {
+            "input": 2.0,
+            "output": 8.0,
+            "cache_read": 0.5,
+            "cache_write": 1.5,
+          },
+        },
+      },
+    },
+  },
+}

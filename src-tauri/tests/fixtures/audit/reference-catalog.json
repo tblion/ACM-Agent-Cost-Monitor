@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-25T00:00:00Z",
+  "sourceVersion": "audit-fixture-1",
+  "rates": [
+    {
+      "provider": "fixture-history",
+      "model": "fixture-model",
+      "effectiveFrom": "2025-01-01T00:00:00Z",
+      "input": 1.0,
+      "output": 2.0,
+      "cacheRead": 0.0,
+      "cacheWrite": 0.0,
+      "source": "fixture"
+    },
+    {
+      "provider": "fixture-history",
+      "model": "fixture-model",
+      "effectiveFrom": "2026-01-01T00:00:00Z",
+      "input": 3.0,
+      "output": 4.0,
+      "cacheRead": 0.0,
+      "cacheWrite": 0.0,
+      "source": "fixture"
+    }
+  ]
+}
