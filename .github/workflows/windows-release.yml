@@ -39,7 +39,7 @@ jobs:
         run: npm ci
 
       - name: Build Tauri application
-        run: npm run tauri build
+        run: npm run tauri build -- --config src-tauri/tauri.windows.conf.json
 
       - name: Locate Windows installer
         id: installer
