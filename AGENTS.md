@@ -14,6 +14,23 @@ Application desktop Tauri 2 : backend Rust dans `src-tauri/`, frontend React 19/
 - `npm run test:release` teste le générateur de catalogue sans remplacer le catalogue embarqué.
 - `npm run release:prepare` génère un catalogue temporaire, le valide via le binaire Rust `validate_pricing`, puis le remplace atomiquement. Une source alternative se passe avec `-- --source chemin/vers/source.json`.
 
+## Releases multiplateformes
+
+Chaque version publiée doit fournir des installateurs pour les trois familles de systèmes avant d'être considérée comme complète :
+
+- Windows x64 : installateur NSIS `.exe`.
+- macOS : bundles Apple Silicon et Intel.
+- Linux x64 : bundle Linux produit par le workflow de release.
+
+Checklist obligatoire pour chaque release :
+
+1. Utiliser une version SemVer sans préfixe dans les fichiers (`1.0.0`) et un tag Git conventionnel avec préfixe (`v1.0.0`). Synchroniser `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` et `src-tauri/tauri.conf.json`.
+2. Pousser le tag et attendre la fin du workflow `Release desktop bundles`.
+3. Vérifier sur GitHub que la release contient les artefacts Windows, macOS et Linux ; un workflow Windows vert seul ne suffit pas.
+4. Ne pas annoncer la release comme terminée tant que les quatre jobs de bundles (Windows, macOS Apple Silicon, macOS Intel et Linux) ne sont pas verts et que leurs assets sont présents dans la release.
+
+Commande de contrôle : `gh release view vX.Y.Z --repo tblion/OpencodeCostsViewer --json isDraft,isPrerelease,assets`.
+
 ## Architecture et contraintes
 
 - `src-tauri/src/db.rs` ouvre `opencode.db` en lecture seule ; aucune migration, écriture ou réécriture de cette base n'est permise.
