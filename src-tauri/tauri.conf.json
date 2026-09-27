@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Opencode Costs Viewer",
-  "version": "1.1.0-beta.1",
+  "version": "1.0.0",
   "identifier": "com.fcpb6403.opencode-costs-viewer",
   "build": {
     "beforeDevCommand": "npm run dev",
