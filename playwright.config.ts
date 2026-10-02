@@ -9,6 +9,7 @@ const webServerCommand = process.platform === "win32" ? "node e2e/start-mock.mjs
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: ["**/electron-app.spec.ts"],
   outputDir: testResultsDir,
   fullyParallel: false,
   workers,

@@ -4,8 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const defaultSource = join(root, "src-tauri", "catalog", "pricing-source.json");
-const defaultOutput = join(root, "src-tauri", "catalog", "pricing.json");
+const defaultSource = join(root, "src-dotnet", "Resources", "pricing-source.json");
+const defaultOutput = join(root, "src-dotnet", "Resources", "pricing.json");
 
 export function parseArguments(argumentsList) {
   const argumentsMap = new Map();

@@ -1,0 +1,69 @@
+appId: com.fcpb6403.acm-agent-cost-monitor
+productName: ACM Agent Cost Monitor
+asar: true
+directories:
+  buildResources: assets/icons
+  output: release
+files:
+  - dist-electron/**/*
+  - dist-electron-renderer/**/*
+  - package.json
+  - assets/icons/icon.png
+  - assets/icons/icon.ico
+extraResources:
+  - from: src-dotnet/publish/backend
+    to: backend
+    filter:
+      - "**/*"
+      - "!**/*.pdb"
+win:
+  icon: assets/icons/icon.ico
+  target:
+    - nsis
+    - msi
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  shortcutName: ACM Agent Cost Monitor
+  deleteAppDataOnUninstall: false
+msi:
+  oneClick: true
+  perMachine: true
+  upgradeCode: "{CCC7CE0A-1B08-4CF1-9A31-2DAA5385CD29}"
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  shortcutName: ACM Agent Cost Monitor
+  runAfterFinish: false
+mac:
+  icon: assets/icons/icon.icns
+  target:
+    - dmg
+dmg:
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+linux:
+  icon: assets/icons/128x128.png
+  executableName: acm-agent-cost-monitor
+  category: Utility
+  target:
+    - deb
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libsqlite3-0

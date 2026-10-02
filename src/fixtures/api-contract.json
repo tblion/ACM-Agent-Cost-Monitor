@@ -1,4 +1,5 @@
 {
+  "protocolVersion": 1,
   "settings": {
     "dbPath": null,
     "configPath": null,
@@ -93,8 +94,20 @@
       "storedCostTotal": 1,
       "calculatedCostTotal": 0,
       "selectedCostTotal": 1,
-      "tokens": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "reasoning": 0},
-      "anomalyCounts": {"missingTokens": 1, "missingDate": 1, "missingRate": 0, "invalidRate": 0, "storedCostFallback": 1}
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "anomalyCounts": {
+        "missingTokens": 1,
+        "missingDate": 1,
+        "missingRate": 0,
+        "invalidRate": 0,
+        "storedCostFallback": 1
+      }
     },
     "messages": [
       {
@@ -113,11 +126,347 @@
         "effectiveFrom": null,
         "rate": null,
         "breakdown": null,
-        "anomalies": ["missingDate", "storedCostFallback"]
+        "anomalies": [
+          "missingDate",
+          "storedCostFallback"
+        ]
       }
     ],
     "ignored": [],
     "sessions": [],
-    "invariants": {"valid": true, "failed": []}
-  }
+    "invariants": {
+      "valid": true,
+      "failed": []
+    }
+  },
+  "operations": [
+    {
+      "request": {
+        "id": "req-get-data",
+        "operation": "get_data",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-data",
+        "result": [
+          {
+            "id": "session-1",
+            "project": "project",
+            "title": "Example",
+            "date": 1760000000000,
+            "cost": 1.25,
+            "tokens": {
+              "input": 10,
+              "output": 20,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0
+            },
+            "isSubagent": false,
+            "parentId": null,
+            "source": "configured",
+            "models": [
+              {
+                "provider": "provider",
+                "model": "model",
+                "cost": 1.25,
+                "tokens": {
+                  "input": 10,
+                  "output": 20,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0
+                },
+                "source": "configured"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-settings",
+        "operation": "get_settings",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-settings",
+        "result": {
+          "dbPath": null,
+          "configPath": null,
+          "live": false,
+          "theme": "system",
+          "language": null,
+          "defaultPeriodDays": 30,
+          "customGroups": []
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-settings-status",
+        "operation": "get_settings_status",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-settings-status",
+        "result": {
+          "settings": {
+            "dbPath": null,
+            "configPath": null,
+            "live": false,
+            "theme": "system",
+            "language": null,
+            "defaultPeriodDays": 30,
+            "customGroups": []
+          },
+          "diagnostic": null,
+          "liveActive": false
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-runtime-metrics",
+        "operation": "get_runtime_metrics",
+        "arguments": {
+          "includeDatabaseSize": true
+        },
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-runtime-metrics",
+        "result": {
+          "databaseSizeBytes": 4096,
+          "processMemoryBytes": 104857600,
+          "measuredAt": 1760000000000
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-save-settings",
+        "operation": "save_settings",
+        "arguments": {
+          "s": {
+            "dbPath": null,
+            "configPath": null,
+            "live": false,
+            "theme": "dark",
+            "language": "fr",
+            "defaultPeriodDays": 30,
+            "customGroups": []
+          }
+        },
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-save-settings",
+        "result": null
+      }
+    },
+    {
+      "request": {
+        "id": "req-pick-path",
+        "operation": "pick_path",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-pick-path",
+        "result": null
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-resolved-paths",
+        "operation": "get_resolved_paths",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-resolved-paths",
+        "result": {
+          "db": "/home/user/.local/share/opencode/opencode.db",
+          "config": "/home/user/.config/opencode/opencode.jsonc"
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-rates",
+        "operation": "get_rates",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-rates",
+        "result": [
+          {
+            "provider": "provider",
+            "model": "model",
+            "input": 1,
+            "output": 2,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "source": "catalog",
+            "effectiveFrom": "2025-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-cost-summary",
+        "operation": "get_cost_summary",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-cost-summary",
+        "result": [
+          {
+            "provider": "provider",
+            "model": "model",
+            "messages": 1,
+            "storedCost": 1.25,
+            "configured": false
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-catalog-status",
+        "operation": "get_catalog_status",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-catalog-status",
+        "result": {
+          "valid": true,
+          "version": 1,
+          "generatedAt": "2026-01-01T00:00:00Z",
+          "sourceVersion": "test",
+          "rateCount": 1
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-recalculate-data",
+        "operation": "recalculate_data",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-recalculate-data",
+        "result": {
+          "sessions": [],
+          "diagnostics": {
+            "catalogueValid": true,
+            "recalculableMessages": 1,
+            "missingDates": 0,
+            "missingTokens": 0,
+            "missingRates": 0
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-get-audit-report",
+        "operation": "get_audit_report",
+        "arguments": {},
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-get-audit-report",
+        "result": {
+          "generatedAt": "2026-01-01T00:00:00Z",
+          "valid": true,
+          "provenance": {
+            "databasePath": "db",
+            "configPath": "config",
+            "catalogPath": "catalog",
+            "catalogVersion": 1,
+            "catalogSourceVersion": "test",
+            "catalogGeneratedAt": "2026-01-01T00:00:00Z",
+            "catalogRateCount": 1
+          },
+          "summary": {
+            "allSessions": 0,
+            "totalMessages": 0,
+            "sessionsWithAssistant": 0,
+            "assistantMessages": 0,
+            "ignoredMessages": 0,
+            "recalculableMessages": 0,
+            "customRateMessages": 0,
+            "catalogRateMessages": 0,
+            "storedFallbackMessages": 0,
+            "missingTokenMessages": 0,
+            "missingDateMessages": 0,
+            "missingRateMessages": 0,
+            "storedCostTotal": 0,
+            "calculatedCostTotal": 0,
+            "selectedCostTotal": 0,
+            "tokens": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0
+            },
+            "anomalyCounts": {
+              "missingTokens": 0,
+              "missingDate": 0,
+              "missingRate": 0,
+              "invalidRate": 0,
+              "storedCostFallback": 0
+            }
+          },
+          "messages": [],
+          "ignored": [],
+          "sessions": [],
+          "invariants": {
+            "valid": true,
+            "failed": []
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "id": "req-export-audit-report",
+        "operation": "export_audit_report",
+        "arguments": {
+          "content": "{\"valid\":true}",
+          "suggestedName": "opencode-audit.json"
+        },
+        "protocolVersion": 1
+      },
+      "response": {
+        "id": "req-export-audit-report",
+        "result": "/home/user/Downloads/opencode-audit.json"
+      }
+    }
+  ],
+  "errorExample": {
+    "id": "req-get-data-error",
+    "error": {
+      "code": "database",
+      "message": "Unable to open the configured database."
+    }
+  },
+  "events": [
+    {
+      "event": "db-changed",
+      "payload": null
+    }
+  ]
 }

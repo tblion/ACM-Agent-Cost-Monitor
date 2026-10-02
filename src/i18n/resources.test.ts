@@ -106,8 +106,8 @@ describe("i18n foundation", () => {
   });
 
   it("provides translated brand and token series labels", () => {
-    expect(resources.fr.translation.header.brand).toBe("Opencode Costs Viewer");
-    expect(resources.en.translation.header.brand).toBe("Opencode Costs Viewer");
+    expect(resources.fr.translation.header.brand).toBe("ACM Agent Cost Monitor");
+    expect(resources.en.translation.header.brand).toBe("ACM Agent Cost Monitor");
     expect(resources.fr.translation.charts.tokenValue).toBe("Tokens");
     expect(resources.en.translation.charts.tokenValue).toBe("Tokens");
   });

@@ -1,5 +1,7 @@
 # Architecture Improvements Implementation Plan
 
+> Archive historique : ce plan décrit l'ancienne architecture Tauri/Rust et est conservé uniquement comme trace des changements passés. L'architecture actuelle est Electron + React + .NET ; ne pas exécuter les anciennes commandes Tauri/Cargo ci-dessous.
+
 **Goal:** Corriger les problèmes identifiés et rendre l’application plus fiable, lisible et maintenable sans réécriture complète.
 
 **Architecture:** Conserver Tauri, React et Rust, mais déplacer progressivement les responsabilités vers des services dédiés. Chaque évolution doit être testée avant implémentation et rester indépendante autant que possible.

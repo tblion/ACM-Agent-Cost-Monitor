@@ -1,9 +1,6 @@
-name: Build Windows release
+name: Rebuild Windows release installers
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -19,47 +16,87 @@ jobs:
     runs-on: windows-latest
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      DOTNET_RID: win-x64
 
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Tauri application
-        run: npm run tauri build -- --config src-tauri/tauri.windows.conf.json
+      - name: Verify synchronized release versions
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: node scripts/verify-release-version.mjs
 
-      - name: Locate Windows installer
-        id: installer
+      - name: Generate and validate pricing catalog
+        run: npm run release:prepare
+
+      - name: Build NSIS and MSI installers
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: npm run desktop:package -- --win --x64
+
+      - name: Test Windows installers
+        shell: pwsh
+        run: ./scripts/verify-windows-installers.ps1
+
+      - name: Locate Windows installers
+        id: installers
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
-          if ($null -eq $installer) {
-            throw "Aucun installateur NSIS .exe n'a été généré."
-          }
-          "path=$($installer.FullName)" >> $env:GITHUB_OUTPUT
-          "name=$($installer.Name)" >> $env:GITHUB_OUTPUT
+          $exe = Get-ChildItem -Path "release" -Filter "*.exe" -File -Recurse | Select-Object -First 1
+          $msi = Get-ChildItem -Path "release" -Filter "*.msi" -File -Recurse | Select-Object -First 1
+          if ($null -eq $exe) { throw "Aucun installateur NSIS .exe n'a été généré." }
+          if ($null -eq $msi) { throw "Aucun installateur MSI n'a été généré." }
+          "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          "msi=$($msi.FullName)" >> $env:GITHUB_OUTPUT
 
-      - name: Upload workflow artifact
+      - name: Upload workflow installers
         uses: actions/upload-artifact@v6
         with:
-          name: opencode-costs-viewer-windows-x64
-          path: ${{ steps.installer.outputs.path }}
+          name: acm-agent-cost-monitor-windows-x64
+          path: |
+            ${{ steps.installers.outputs.exe }}
+            ${{ steps.installers.outputs.msi }}
+          if-no-files-found: error
 
-      - name: Upload installer to GitHub release
+      - name: Upload installers to GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
-        run: gh release upload "$env:RELEASE_TAG" "${{ steps.installer.outputs.path }}" --repo "${{ github.repository }}" --clobber
+        run: gh release upload "$env:RELEASE_TAG" "${{ steps.installers.outputs.exe }}" "${{ steps.installers.outputs.msi }}" --repo "${{ github.repository }}" --clobber
+
+      - name: Verify cross-platform release completeness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $assets = @(gh release view "$env:RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')
+          $version = $env:RELEASE_TAG.Substring(1)
+          $windowsPrefix = [regex]::Escape("ACM Agent Cost Monitor-$version-")
+          $exe = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.exe$" })
+          $msi = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.msi$" })
+          $dmgs = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.dmg$" })
+          $deb = @($assets | Where-Object { $_ -match "^acm-agent-cost-monitor[_-]$([regex]::Escape($version)).*\.deb$" })
+          if ($exe.Count -ne 1) { throw "Release must contain exactly one NSIS .exe for version $version." }
+          if ($msi.Count -ne 1) { throw "Release must contain exactly one MSI for version $version." }
+          if ($dmgs.Count -ne 2) { throw "Release must contain exactly two DMGs for version $version." }
+          if (@($dmgs | Where-Object { $_ -match '(arm64|aarch64)' }).Count -ne 1) { throw "Release must contain one Apple Silicon DMG for version $version." }
+          if (@($dmgs | Where-Object { $_ -match '(x64|x86_64)' }).Count -ne 1) { throw "Release must contain one Intel DMG for version $version." }
+          if ($deb.Count -ne 1) { throw "Release must contain exactly one Linux .deb for version $version." }

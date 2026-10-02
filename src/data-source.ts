@@ -1,6 +1,6 @@
 import * as api from "./api";
 import { createDemoAuditReport, createDemoRecalculationResult, generateDemoSnapshot } from "./demo/generator";
-import { getE2eDemoSnapshot } from "./mock/tauri-mock";
+import { getE2eDemoSnapshot } from "./mock/desktop-mock";
 import type { AuditReport, CatalogStatus, CostSummary, RateEntry, RecalculationResult, SessionRecord } from "./types";
 
 export type DataMode = "real" | "demo";

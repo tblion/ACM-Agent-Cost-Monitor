@@ -10,10 +10,6 @@ import { AboutModal } from "./AboutModal";
 const reactActEnvironment = (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openUrl: vi.fn(),
-}));
-
 const mounted: Root[] = [];
 
 async function renderModal(onClose = vi.fn()): Promise<{ container: HTMLElement; root: Root }> {
@@ -60,8 +56,12 @@ describe("AboutModal", () => {
     expect(container.querySelector('a[href^="mailto:"]')).toBeNull();
   });
 
-  it("opens both project links through the opener plugin", async () => {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
+  it("opens both project links through the desktop bridge", async () => {
+    const openExternalUrl = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window, "desktopApi", {
+      configurable: true,
+      value: { openExternalUrl },
+    });
     const { container } = await renderModal();
     const links = Array.from(container.querySelectorAll<HTMLAnchorElement>("a"));
 
@@ -69,9 +69,9 @@ describe("AboutModal", () => {
       links.forEach(link => link.click());
     });
 
-    expect(openUrl).toHaveBeenCalledTimes(2);
-    expect(openUrl).toHaveBeenCalledWith("https://github.com/tblion/OpencodeCostsViewer");
-    expect(openUrl).toHaveBeenCalledWith("https://github.com/tblion/OpencodeCostsViewer/blob/main/LICENSE");
+    expect(openExternalUrl).toHaveBeenCalledTimes(2);
+    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/tblion/OpencodeCostsViewer");
+    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/tblion/OpencodeCostsViewer/blob/main/LICENSE");
   });
 
   it("keeps the license text scrollable and closes from the button", async () => {

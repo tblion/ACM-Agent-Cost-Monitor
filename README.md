@@ -1,8 +1,8 @@
-# Opencode Costs Viewer
+# ACM Agent Cost Monitor
 
 [Français](README.fr.md)
 
-Desktop application for Windows, macOS, and Linux that calculates the token and dollar cost of each **opencode** session and project from the local `opencode.db` database. It replaces the legacy PowerShell script `Get-OpencodeSessionCosts.ps1` (kept in `_old/`).
+Desktop application for Windows, macOS, and Linux, designed to track the cost and token usage of AI coding agents. **The current release supports OpenCode only**: it reads sessions from the local `opencode.db` database. Claude Code, Cline, Kilo Code, and other agents are not supported yet.
 
 Unlike the script, it provides a graphical interface with filters, charts, a sortable table, live mode, and persistent settings.
 
@@ -11,44 +11,42 @@ Unlike the script, it provides a graphical interface with filters, charts, a sor
 - **KPIs**: total cost, tokens, number of sessions (including subagents), and number of projects for the filtered period.
 - **Filters**: by project, model, provider, and date range.
 - **Charts**: cost over time, by project, model, and provider; token breakdown; most expensive sessions; and cost by project group (automatic parent folder plus custom groups).
+- **Audit**: trace which database rows, rates, and token counts produced the displayed totals.
 - **Session table**: sortable by date or cost, with a `rate ✓` badge (custom rate applied) or `cost 0` (local/free model, reported but not hidden).
 - **Live mode**: the `LIVE` button in the header enables automatic updates as soon as the opencode database changes (file watching with debounce).
-- **Persistent settings**: database and configuration paths, theme (system/light/dark), default period, and custom project groups. Saved in `settings.json`.
+- **Persistent settings**: database and rates configuration paths, theme (system/light/dark), interface language, default period, and custom project groups. Saved separately from OpenCode's database.
 
-Costs are recalculated with the custom rates from `opencode.jsonc` (`provider.<id>.models.<model>.cost`); otherwise, the cost already stored by opencode is used. Reasoning tokens are charged at the `output` rate.
+## Cost calculation and data handling
+
+For each assistant message, the application chooses a rate in this order:
+
+1. A custom rate in `opencode.jsonc` (`provider.<id>.models.<model>.cost`).
+2. The embedded pricing catalog, using the rate effective on the message date.
+3. The cost already stored by OpenCode when no rate can be resolved.
+
+Input, output, cache-read, and cache-write tokens are priced separately. Reasoning tokens use the `output` rate. Calculations run locally; the app does not need provider API keys or query model APIs. The OpenCode database is opened read-only and is never migrated or rewritten. The app writes its own settings and user-requested exports only.
+
+## Download
+
+Choose the installer for your operating system from [GitHub Releases](https://github.com/tblion/OpencodeCostsViewer/releases). Installers include the .NET backend, so end users do not need Node.js or .NET. Supported packages are Windows x64 (NSIS `.exe` and MSI), macOS Apple Silicon/Intel (DMG), and Linux x64 (`.deb`).
 
 ## Prerequisites
 
-### All systems
+- [Node.js](https://nodejs.org) 22 LTS (`^20.19.0` or `>=22.12.0`).
+- [.NET SDK](https://dotnet.microsoft.com/download/dotnet/10.0) 10.0 for development and local builds.
+- macOS bundle builds require Xcode Command Line Tools (`xcode-select --install`).
 
-- [Rust](https://rustup.rs) (stable)
-- [Node.js](https://nodejs.org) `^20.19.0` or `>=22.12.0` (Node.js 22 LTS recommended)
-
-### Windows
-
-- **Microsoft C++ Build Tools**: download the installer from [visualstudio.microsoft.com/visual-cpp-build-tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) and select **Desktop development with C++**.
-- **WebView2**: preinstalled on recent Windows 10/11 systems. Otherwise install the [WebView2 runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
-
-### macOS
-
-- **Xcode Command Line Tools**:
-  ```sh
-  xcode-select --install
-  ```
-
-### Linux (Debian / Ubuntu)
+For Electron development/builds on Debian or Ubuntu, install Electron's desktop libraries and SQLite:
 
 ```sh
 sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev \
-  build-essential curl wget file \
-  libxdo-dev libssl-dev \
-  libayatana-appindicator3-dev librsvg2-dev
+sudo apt install libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils \
+  libatspi2.0-0 libuuid1 libsecret-1-0 libsqlite3-0
 ```
 
-> Fedora: `sudo dnf install webkit2gtk4.1-devel` · Arch: `sudo pacman -S webkit2gtk-4.1`
+End-user installers include a self-contained .NET backend; users do not need Node.js or .NET installed.
 
-## Installation
+## Development setup
 
 ```sh
 git clone https://github.com/tblion/OpencodeCostsViewer.git
@@ -56,104 +54,61 @@ cd OpencodeCostsViewer
 npm ci
 ```
 
-## Development
-
-### Development mode
+## Development and local builds
 
 ```sh
-npm run tauri dev
+npm run electron:dev
 ```
 
-This compiles the Rust backend, starts the Vite server, and opens the application window.
+`electron:dev` starts Vite, builds the Electron main/preload processes, builds the .NET backend, and opens the desktop window. `npm run build` checks only the React renderer. `npm run desktop:package` builds the installer for the current host OS.
 
-## Local builds
+For browser-only development with demo data, use `npm run dev:mock` (port 1421). Other useful commands:
 
-Local builds produce installers for the platform on which the command is run. Tauri does not automatically build bundles for other systems from macOS, Windows, or Linux.
+| Command | Purpose |
+|---|---|
+| `npm run build` | Type-check and build the React renderer. |
+| `npm run electron:build:desktop` | Build the renderer, Electron main/preload, and type-check Electron code. |
+| `npm run desktop:package` | Package the application for the current OS. |
+| `npm run release:prepare` | Generate and validate the embedded pricing catalog. |
 
-### macOS
+Each platform produces its own installer:
 
-```sh
-npm run tauri build
-```
-
-On Apple Silicon, artifacts are generated in:
-
-```text
-src-tauri/target/release/bundle/macos/Opencode Costs Viewer.app
-src-tauri/target/release/bundle/dmg/Opencode Costs Viewer_<version>_aarch64.dmg
-```
-
-On an Intel Mac, the DMG name contains `x86_64` instead of `aarch64`.
-
-### Windows
-
-In PowerShell:
-
-```powershell
-npm run tauri build
-```
-
-Installers are generated in `src-tauri/target/release/bundle/`, including:
-
-```text
-nsis/*.exe
-msi/*.msi
-```
-
-### Linux
-
-```sh
-npm run tauri build
-```
-
-Artifacts are generated in `src-tauri/target/release/bundle/`, including:
-
-```text
-appimage/*.AppImage
-deb/*.deb
-rpm/*.rpm
-```
-
-### Frontend-only build
-
-To verify the frontend without compiling Tauri:
-
-```sh
-npm run build
-```
+- **Windows x64:** NSIS `.exe` for a per-user install (no administrator rights), plus MSI for a per-machine install managed by IT (administrator rights required). Both create one Start Menu shortcut and no desktop shortcut. Do not install both variants on the same machine.
+- **macOS:** Apple Silicon and Intel DMGs; each DMG contains the app and an `Applications` folder alias for drag-and-drop installation.
+- **Linux x64:** Debian/Ubuntu `.deb`, which installs one desktop/menu launcher and depends on the system `libsqlite3-0` library.
 
 ## GitHub releases
 
-The `.github/workflows/release.yml` workflow builds and publishes the following bundles for every `v*` tag:
+The `.github/workflows/release.yml` workflow builds and publishes these installers for each `v*` tag:
 
 - macOS Apple Silicon (`aarch64`)
 - macOS Intel (`x86_64`)
 - Windows x64 (`.exe` and `.msi`)
-- Linux x64 (`.deb`, `.rpm`, and `.AppImage`)
+- Linux x64 (`.deb`)
 
-To publish a new release from `main`:
+After synchronizing the project version to `1.2.3`, publish the matching tag from `main`:
 
 ```sh
-git tag v1.1.0-beta.1
-git push origin v1.1.0-beta.1
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-The release workflow runs for any `v*` tag and derives the release tag from the version in `package.json`, `Cargo.toml`, and `tauri.conf.json`. The current version is `v1.1.0-beta.1`, and the workflow publishes it as a pre-release. The workflow can also be started from GitHub's **Actions** tab. The `.github/workflows/windows-release.yml` workflow can additionally rebuild only the Windows installer and attach it to an existing release by specifying its tag, such as `v1.1.0-beta.1`.
+The release workflow requires a `v`-prefixed SemVer tag and verifies synchronized project versions before packaging. A separate manual Windows workflow can rebuild the NSIS and MSI installers for an existing release; it verifies that all five platform installers are present before succeeding. MSI upgrades are distributed by the DSI; NSIS is the per-user consumer installer.
 
-Published bundles are currently unsigned. macOS and Windows may therefore display a security warning on first launch.
+macOS signing/notarization and Windows signing are enabled in CI when their certificate and Apple notarization secrets are configured. Without those secrets, the installers are unsigned and the operating system may display a security warning on first launch.
 
 ### Allow the application on macOS
 
 After downloading the DMG:
 
-1. Open the DMG and drag `Opencode Costs Viewer.app` to **Applications**.
+1. Open the DMG and drag `ACM Agent Cost Monitor.app` to **Applications**.
 2. Right-click the application, choose **Open**, then confirm **Open**.
 3. If macOS still blocks the application, open **System Settings -> Privacy & Security** and click **Open Anyway**.
 
 If macOS reports that “the application is damaged and cannot be opened”, remove only the quarantine attribute from the application copied to Applications:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/Opencode Costs Viewer.app"
+xattr -dr com.apple.quarantine "/Applications/ACM Agent Cost Monitor.app"
 ```
 
 Then relaunch the application. This command bypasses macOS download protection; use it only for a bundle from this repository or a trusted release. It does not repair a genuinely corrupted binary or sign the application.
@@ -162,13 +117,13 @@ To remove these warnings automatically for all users, the application must be si
 
 ## Pricing catalog and releases
 
-The embedded catalog contains official API rates collected on September 23, 2026. The declared source is `src-tauri/catalog/pricing-source.json`. `effectiveFrom` dates are the catalog adoption dates because providers do not publish historical effective dates. Rates use the standard short-context tier; the Google Gemini Pro rate uses the `<=200k` token tier because the application does not know prompt size, and DeepSeek rates intentionally use the peak tier. To prepare a release, the repository generates a temporary catalog, validates it with the same Rust validator used by the application, and replaces the existing catalog atomically only after validation:
+The embedded catalog contains official API rates collected on September 23, 2026. Its source and generated form live in `src-dotnet/Resources/`. `effectiveFrom` dates are the catalog adoption dates because providers do not publish historical effective dates. Rates use the standard short-context tier; the Google Gemini Pro rate uses the `<=200k` token tier because the application does not know prompt size, and DeepSeek rates intentionally use the peak tier. To prepare a release, the repository generates a temporary catalog, validates it with the .NET backend, and replaces the embedded catalog atomically only after validation. The application validates the catalog again when loading it at runtime:
 
 ```sh
 npm run release:prepare
 ```
 
-An alternative local source can be provided explicitly with `npm run release:prepare -- --source path/to/source.json`. A missing, unparsable, empty, ambiguous, or incomplete source makes the command fail without replacing the last valid catalog. CI runs this command before the Tauri bundle.
+An alternative local source can be provided explicitly with `npm run release:prepare -- --source path/to/source.json`. A missing, unparsable, empty, ambiguous, or incomplete source makes the command fail without replacing the last valid catalog. CI runs this command before the Electron bundles.
 
 > A macOS bundle must be built **on a Mac**; a Windows bundle must be built **on Windows**.
 
@@ -183,66 +138,39 @@ On first launch, the application uses opencode's default paths (XDG convention, 
 
 If your opencode installation uses different paths, change them in **Settings** (the header's gear icon) with the *Browse...* buttons. The choice is stored in `settings.json` (the application's configuration directory).
 
-## Tests
+## End-to-end validation
 
 ```sh
-# Backend tests (Rust): costs, JSONC, configuration, aggregation, settings
-cd src-tauri && cargo test
-
-# Frontend tests (TypeScript): filtering + aggregations
-npm test
-
-# Playwright E2E tests: isolated mock frontend, headless Chromium
 npx playwright install chromium
 npm run test:e2e
-
+npm run test:e2e:electron
+npm run test:e2e:packaged
+npm run test:release
 ```
 
-For the acceptance test, provide a database snapshot and a CSV generated by the legacy script.
+`test:e2e` exercises the browser demo with isolated SQLite WASM fixtures. `test:e2e:electron` launches the development Electron app with the real .NET backend. `test:e2e:packaged` builds the host installer and runs the same scenarios against its packaged application bundle. The native scenarios cover read-only database behavior, costs, audit, settings, file dialogs, export, and live mode; none reads or modifies a user's `opencode.db`.
 
-POSIX shells (macOS/Linux):
+## Technology stack and architecture
 
-```sh
-cd src-tauri
-ACCEPTANCE_DB="/path/to/opencode.db" \
-ACCEPTANCE_CSV="/path/to/opencode-costs.csv" \
-cargo test --test acceptance_test -- --nocapture
+- **UI:** React 19, TypeScript, Vite, Recharts, and i18next (English/French).
+- **Desktop shell:** Electron with context isolation, a sandboxed preload, and no direct Node.js access from the renderer.
+- **Backend:** .NET 10 / C#, launched and supervised by Electron main. Requests and responses use JSON Lines over standard input/output.
+- **Storage:** SQLite through the operating system's SQLite library (`winsqlite3` on Windows, `sqlite3` on macOS/Linux). The OpenCode database is read-only; app settings are stored separately.
+- **Validation:** Playwright E2E tests against the browser mock, the real Electron/.NET app, and the packaged desktop app.
+
+```text
+React renderer -> typed preload API -> Electron IPC -> .NET backend
+                                                    -> OpenCode SQLite (read-only)
+                                                    -> OpenCode JSONC rates
+                                                    -> embedded historical rate catalog
 ```
 
-PowerShell (Windows):
-
-```powershell
-cd src-tauri
-$env:ACCEPTANCE_DB = "C:\path\to\opencode.db"
-$env:ACCEPTANCE_CSV = "C:\path\to\opencode-costs.csv"
-cargo test --test acceptance_test -- --nocapture
-```
-
-E2E tests automatically start the mock frontend on a free `127.0.0.1` port with `VITE_E2E=true`. The launcher reads `e2e/fixtures/opencode-fixture.sql`, creates two isolated SQLite WASM copies with `sql.js`, generates JSON snapshots through SQLite queries, then explicitly passes the manifest, snapshots, paths, and hash to the server through environment variables; the mock loads the selected snapshot as its initial source. The live operation `window.__E2E__.mutateSql()` inserts a row into the primary copy, regenerates its snapshot, and triggers an application reload. Changing `dbPath` through `SettingsModal`/`save_settings` selects the snapshot from the second copy. No test reads or writes `opencode.db`. The mock browser cannot run the real Tauri backend, SQLite, or native watcher: these tests validate the SQLite WASM fixture and mock flow, while real SQLite/watcher execution is covered by Rust tests. Initial scenarios are selected through the query string; live and data changes go through `window.__E2E__`, which is unavailable outside this mode. The `?e2e=no-settings` scenario explicitly simulates missing configuration through the mock error, without starting a real Tauri backend.
-
-`npm run test:e2e` automatically reserves a free HTTP port for each run; `E2E_PORT=4321 npm run test:e2e` can force a single port in CI or for diagnosis. The SQLite WASM control server also uses a system-assigned port, and reports/results are stored by port to allow concurrent runs.
-The `1422` sometimes visible in historical examples is not reserved: the dynamic runner is the configuration used by `npm run test:e2e`.
-The stable configuration uses `workers: 1` and `fullyParallel: false`, because scenarios share the mock server for one run. A direct `npx playwright test` invocation must provide `E2E_PORT` (`E2E_PORT=4321 npx playwright test`); no fixed fallback port is accepted. `E2E_WORKERS=2 npm run test:e2e` is possible only for fixtures explicitly isolated per test. Application port reservation happens before Playwright's `webServer` starts: a very small TOCTOU window remains between releasing the reservation and the actual bind, while the control port is chosen directly by the launcher at startup.
-
-`defaultPeriodDays` is constrained to `1..3650` days. An invalid value falls back to 30 days in the mock E2E scenario; validation rules and real SQLite/Tauri behavior are covered in Rust. The `?e2e=no-settings` scenario represents a missing file: the mock returns `Settings::default()` without diagnostics or persistence. The `?e2e=settings-invalid` scenario remains dedicated to invalid JSON/configuration. Mock browser tests do not replace Rust watcher tests or real Tauri IPC tests; they cover only the frontend and its mock adapter.
-
-## Structure
+## Repository structure
 
 ```
-src-tauri/          Rust backend (Tauri 2)
-  src/
-    model.rs        Shared types (SessionRecord, Settings, ...)
-    cost.rs         Per-message cost calculation
-    jsonc.rs        Comment removal + trailing commas (JSONC)
-    config.rs       Rate extraction from opencode.jsonc
-    db.rs           opencode.db read access (rusqlite, read-only)
-    aggregate.rs    Session aggregation
-    settings.rs     settings.json loading/saving
-    commands.rs     Tauri commands (get_data, get_settings, ...)
-    watcher.rs      DB file monitoring (live mode)
-src/                React + TypeScript + Vite frontend
-  components/       Header, FilterBar, KpiCards, SessionTable, SettingsModal, charts/
-  lib/aggregate.ts  Client-side filtering + aggregations
-  theme.ts          OS-aware theme
-  api.ts            Tauri API client
+electron/             Electron main, sandboxed preload, IPC, backend lifecycle
+src-dotnet/           .NET backend: SQLite, pricing, costs, audit, settings, watcher
+src/                  React renderer, UI components, app hooks, and typed API adapter
+e2e/                  Playwright scenarios and isolated database fixtures
+scripts/              Packaging, release, and installer-validation helpers
 ```

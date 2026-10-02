@@ -1,50 +1,26 @@
 # Workflow de validation de l'audit
 
-Ce document décrit les validations reproductibles de la Task 8. Elles complètent les tests unitaires et ne modifient jamais la base OpenCode.
+Ce document décrit les validations reproductibles de l'audit. Elles ne modifient jamais la base OpenCode.
 
 ## Fixture golden
 
-La fixture déterministe se trouve dans `src-tauri/tests/fixtures/audit/` :
+La fixture de référence se trouve dans `src/fixtures/audit/` :
 
 - `reference.sql` contient les lignes SQLite de test ;
 - `reference-config.jsonc` contient les tarifs configurés ;
 - `reference-catalog.json` contient les tarifs historiques ;
 - `reference-expected.json` est l'oracle écrit manuellement.
 
-Le test golden backend vérifie les coûts par composant, les sources de tarifs, les anomalies, les compteurs de sessions/messages et les invariants :
+`src/demo/audit-fixture.test.ts` conserve une comparaison golden du rapport de démonstration. Les parcours de validation autorisés lancent les scénarios E2E navigateur et Electron avec les fixtures isolées :
 
 ```bash
-cd src-tauri
-cargo test --test audit_test -- --nocapture
+npm run test:e2e
+npm run test:e2e:electron
 ```
 
 Le fichier `reference-expected.json` ne doit pas être régénéré par l'application. Toute modification doit être une évolution volontaire de la fixture ou de l'algorithme, revue avec les valeurs calculées à la main.
 
 Les valeurs manuelles attendues dans l'interface sont : 7 sessions en base, 10 messages totaux, 6 sessions avec assistant, 9 messages assistant, 5 messages recalculables, 4 tarifs configurés, 2 tarifs du catalogue, 4 fallbacks de coût stocké, 1 message avec tokens manquants, 1 avec date manquante et 3 avec tarif manquant. Les totaux sont `58,50` pour le coût retenu, `513,50` pour le coût stocké et `40,00` pour le coût calculé, avec 9 anomalies.
-
-## Test legacy réel
-
-`acceptance_test.rs` compare le calcul de l'application au CSV produit par le script legacy à partir du même snapshot de base. Le test vérifie exactement les deux ensembles d'IDs de session (`csv - app` et `app - csv`), imprime les IDs manquants ou supplémentaires avant l'échec, puis conserve la comparaison des coûts avec la tolérance flottante existante.
-
-Préparer une copie du fichier OpenCode et le CSV legacy, puis lancer :
-
-```bash
-cd src-tauri
-ACCEPTANCE_DB=/chemin/vers/opencode-snapshot.db \
-ACCEPTANCE_CSV=/chemin/vers/session-costs.csv \
-cargo test --test acceptance_test -- --nocapture
-```
-
-Sur PowerShell :
-
-```powershell
-$env:ACCEPTANCE_DB = "C:\chemin\vers\opencode-snapshot.db"
-$env:ACCEPTANCE_CSV = "C:\chemin\vers\session-costs.csv"
-cd src-tauri
-cargo test --test acceptance_test -- --nocapture
-```
-
-Sans `ACCEPTANCE_DB` ou `ACCEPTANCE_CSV`, le test affiche explicitement `SKIP` et retourne sans fabriquer de snapshot ni de CSV.
 
 ## Vérification MCP Chrome
 

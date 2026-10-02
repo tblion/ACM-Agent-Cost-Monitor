@@ -24,7 +24,7 @@ const french = {
     invalid_input: "Les données saisies sont invalides.",
   },
   header: {
-    brand: "Opencode Costs Viewer",
+    brand: "ACM Agent Cost Monitor",
     live: "LIVE",
     liveMode: "Mode live",
     liveReactivate: "Réactiver le mode live",
@@ -334,7 +334,7 @@ const french = {
   },
   about: {
     title: "À propos",
-    description: "Opencode Costs Viewer, application de suivi des coûts.",
+    description: "ACM Agent Cost Monitor, application de suivi des coûts.",
     repositoryLink: "GitHub du projet",
     licenseLink: "Licence MIT · LICENSE",
     licenseTitle: "Licence MIT",
@@ -398,7 +398,7 @@ const english: Translation = {
     invalid_input: "The entered data is invalid.",
   },
   header: {
-    brand: "Opencode Costs Viewer",
+    brand: "ACM Agent Cost Monitor",
     live: "LIVE",
     liveMode: "Live mode",
     liveReactivate: "Reactivate live mode",
@@ -708,7 +708,7 @@ const english: Translation = {
   },
   about: {
     title: "About",
-    description: "Opencode Costs Viewer, a cost tracking application.",
+    description: "ACM Agent Cost Monitor, a cost tracking application.",
     repositoryLink: "Project GitHub",
     licenseLink: "MIT License · LICENSE",
     licenseTitle: "MIT License",

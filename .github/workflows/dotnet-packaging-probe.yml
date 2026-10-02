@@ -1,0 +1,92 @@
+name: Measure .NET backend packaging
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src-dotnet/PackagingProbe/**"
+      - "scripts/measure-dotnet-packaging.mjs"
+      - ".github/workflows/dotnet-packaging-probe.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "src-dotnet/PackagingProbe/**"
+      - "scripts/measure-dotnet-packaging.mjs"
+      - ".github/workflows/dotnet-packaging-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: Measure ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-14
+            rid: osx-arm64
+          - os: macos-13
+            rid: osx-x64
+          - os: ubuntu-22.04
+            rid: linux-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Measure publish modes
+        env:
+          PACKAGING_RID: ${{ matrix.rid }}
+        run: node scripts/measure-dotnet-packaging.mjs
+
+      - name: Upload measurement report and packages
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: dotnet-packaging-${{ matrix.rid }}
+          path: artifacts/packaging-probe/${{ matrix.rid }}/
+          if-no-files-found: warn
+
+  runtime-missing:
+    name: Verify framework-dependent runtime prerequisite
+    runs-on: ubuntu-22.04
+    needs: measure
+    if: ${{ always() }}
+
+    steps:
+      - name: Download Linux probe artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: dotnet-packaging-linux-x64
+          path: artifacts/packaging-probe/linux-x64
+
+      - name: Confirm framework-dependent probe requires .NET runtime
+        shell: bash
+        run: |
+          set +e
+          output=$(docker run --rm \
+            -v "$GITHUB_WORKSPACE/artifacts/packaging-probe/linux-x64/framework-dependent/publish:/app:ro" \
+            mcr.microsoft.com/dotnet/runtime-deps:10.0 \
+            /app/PackagingProbe 2>&1)
+          exit_code=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$exit_code" -eq 0 ]; then
+            echo "Framework-dependent probe unexpectedly ran without a .NET runtime."
+            exit 1
+          fi
+          normalized_output="${output,,}"
+          if [[ "$normalized_output" != *"must install .net"* ]]; then
+            echo "Probe failed for a reason other than the missing .NET runtime."
+            exit 1
+          fi

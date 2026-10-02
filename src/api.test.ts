@@ -1,47 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { invoke } from "@tauri-apps/api/core";
 import { exportAudit, getAuditReport, isApiError, saveSettings, translateApiError } from "./api";
+import type { DesktopApi } from "../electron/renderer-api";
 import type { Settings } from "./types";
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
-
-const mockedInvoke = vi.mocked(invoke);
+const desktopApi = {
+  getAuditReport: vi.fn(),
+  exportAuditReport: vi.fn(),
+  saveSettings: vi.fn(),
+} as unknown as DesktopApi;
 
 describe("audit API commands", () => {
   beforeEach(() => {
-    mockedInvoke.mockReset();
+    vi.resetAllMocks();
+    Object.defineProperty(window, "desktopApi", { configurable: true, value: desktopApi });
   });
 
-  it("calls the exact Tauri command for an audit report", async () => {
+  it("calls the desktop bridge for an audit report", async () => {
     const report = { valid: true };
-    mockedInvoke.mockResolvedValue(report as never);
+    vi.mocked(desktopApi.getAuditReport).mockResolvedValue(report as never);
 
     await expect(getAuditReport()).resolves.toBe(report);
 
-    expect(mockedInvoke.mock.calls).toEqual([["get_audit_report"]]);
+    expect(desktopApi.getAuditReport).toHaveBeenCalledOnce();
   });
 
-  it("calls the exact Tauri export command with content and suggested name", async () => {
+  it("calls the desktop bridge export with content and suggested name", async () => {
     const content = '{"valid":true}\n';
     const suggestedName = "audit-report.json";
-    mockedInvoke.mockResolvedValue("/tmp/audit-report.json" as never);
+    vi.mocked(desktopApi.exportAuditReport).mockResolvedValue("/tmp/audit-report.json" as never);
 
     await expect(exportAudit(content, suggestedName)).resolves.toBe("/tmp/audit-report.json");
 
-    expect(mockedInvoke.mock.calls).toEqual([[
-      "export_audit_report",
-      { content, suggestedName },
-    ]]);
+    expect(desktopApi.exportAuditReport).toHaveBeenCalledWith(content, suggestedName);
   });
 });
 
 describe("settings API commands", () => {
   beforeEach(() => {
-    mockedInvoke.mockReset();
+    vi.resetAllMocks();
+    Object.defineProperty(window, "desktopApi", { configurable: true, value: desktopApi });
   });
 
-  it("preserves the documented save_settings argument mapping", async () => {
+  it("preserves the settings payload through the desktop bridge", async () => {
     const settings: Settings = {
       dbPath: null,
       configPath: null,
@@ -51,11 +51,11 @@ describe("settings API commands", () => {
       defaultPeriodDays: 30,
       customGroups: [],
     };
-    mockedInvoke.mockResolvedValue(undefined as never);
+    vi.mocked(desktopApi.saveSettings).mockResolvedValue(undefined as never);
 
     await saveSettings(settings);
 
-    expect(mockedInvoke.mock.calls).toEqual([["save_settings", { s: settings }]]);
+    expect(desktopApi.saveSettings).toHaveBeenCalledWith(settings);
   });
 });
 

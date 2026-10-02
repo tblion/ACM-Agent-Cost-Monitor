@@ -10,7 +10,7 @@ import {
 } from "./data-source";
 import { DEMO_AUDIT_REPORT } from "./demo/audit-fixture";
 import { generateDemoSnapshot } from "./demo/generator";
-import { invoke as mockInvoke } from "./mock/tauri-mock";
+import { invoke as mockInvoke } from "./mock/desktop-mock";
 import type { AuditReport } from "./types";
 
 vi.mock("./api", () => ({
@@ -125,7 +125,7 @@ describe("data source selection", () => {
     expect(resolveDataMode(storage)).toBe("demo");
   });
 
-  it("delegates every real operation to the Tauri API", async () => {
+  it("delegates every real operation to the desktop API", async () => {
     const sessions = [{ id: "session" }];
     const rates = [{ provider: "provider" }];
     const summary = [{ model: "model" }];
@@ -146,7 +146,7 @@ describe("data source selection", () => {
     expect(getAuditReport).toHaveBeenCalledOnce();
   });
 
-  it("delegates recalculation and catalog status to the Tauri API", async () => {
+  it("delegates recalculation and catalog status to the desktop API", async () => {
     const result = { sessions: [], diagnostics: { catalogueValid: true, recalculableMessages: 1, missingDates: 0, missingTokens: 0, missingRates: 0 } };
     const status = { valid: true, version: 1, generatedAt: "2026-01-01T00:00:00Z", sourceVersion: "test", rateCount: 1 };
     vi.mocked(recalculateData).mockResolvedValue(result);

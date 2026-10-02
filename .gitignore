@@ -5,7 +5,13 @@
 node_modules/
 target/
 dist/
+dist-electron/
+dist-electron-renderer/
 dist-ssr/
+release/
+**/bin/
+**/obj/
+src-dotnet/publish/
 *.local
 
 # Logs
@@ -18,6 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+artifacts/packaging-probe/
 
 # Editor directories and files
 .vscode/*
