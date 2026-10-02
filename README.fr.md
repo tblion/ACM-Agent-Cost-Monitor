@@ -19,34 +19,19 @@ Le coût est recalculé avec les tarifs custom de `opencode.jsonc` (`provider.<i
 
 ## Prérequis
 
-### Tous les systèmes
+- [Node.js](https://nodejs.org) 22 LTS (`^20.19.0` ou `>=22.12.0`).
+- [.NET SDK](https://dotnet.microsoft.com/download/dotnet/10.0) 10.0 pour le développement et les builds locaux.
+- Les bundles macOS nécessitent les Xcode Command Line Tools (`xcode-select --install`).
 
-- [Rust](https://rustup.rs) (stable)
-- [Node.js](https://nodejs.org) `^20.19.0` ou `>=22.12.0` (Node.js 22 LTS recommandé)
-
-### Windows
-
-- **Microsoft C++ Build Tools** : téléchargez l'installateur depuis [visualstudio.microsoft.com/visual-cpp-build-tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) et cochez **Desktop development with C++**.
-- **WebView2** : préinstallé sur les systèmes Windows 10/11 récents. Sinon, installez le [runtime WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
-
-### macOS
-
-- **Xcode Command Line Tools** :
-  ```sh
-  xcode-select --install
-  ```
-
-### Linux (Debian / Ubuntu)
+Pour le développement et les builds Electron sous Debian/Ubuntu, installer les bibliothèques desktop d'Electron et SQLite :
 
 ```sh
 sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev \
-  build-essential curl wget file \
-  libxdo-dev libssl-dev \
-  libayatana-appindicator3-dev librsvg2-dev
+sudo apt install libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils \
+  libatspi2.0-0 libuuid1 libsecret-1-0 libsqlite3-0
 ```
 
-> Fedora : `sudo dnf install webkit2gtk4.1-devel` · Arch : `sudo pacman -S webkit2gtk-4.1`
+Les installateurs utilisateurs incluent un backend .NET autonome ; Node.js et .NET n'ont pas à être installés séparément.
 
 ## Installation
 
@@ -56,91 +41,39 @@ cd OpencodeCostsViewer
 npm ci
 ```
 
-## Développement
-
-### Mode développement
+## Développement et builds locaux
 
 ```sh
-npm run tauri dev
+npm run electron:dev
 ```
 
-Cette commande compile le backend Rust, démarre le serveur Vite et ouvre la fenêtre de l'application.
+`electron:dev` démarre Vite, compile les processus main/preload Electron, compile le backend .NET et ouvre la fenêtre desktop. `npm run build` vérifie uniquement le renderer React. `npm run desktop:package` génère l'installateur de l'OS hôte.
 
-## Compilation locale
+Chaque système dispose de son installateur :
 
-La compilation locale produit les installateurs de la plateforme sur laquelle la commande est exécutée. Tauri ne fabrique pas automatiquement les bundles des autres systèmes depuis macOS, Windows ou Linux.
-
-### macOS
-
-```sh
-npm run tauri build
-```
-
-Sur Apple Silicon, les artefacts sont générés dans :
-
-```text
-src-tauri/target/release/bundle/macos/Opencode Costs Viewer.app
-src-tauri/target/release/bundle/dmg/Opencode Costs Viewer_<version>_aarch64.dmg
-```
-
-Sur un Mac Intel, le nom du DMG contient `x86_64` au lieu de `aarch64`.
-
-### Windows
-
-Dans PowerShell :
-
-```powershell
-npm run tauri build
-```
-
-Les installateurs sont générés dans `src-tauri/target/release/bundle/`, notamment :
-
-```text
-nsis/*.exe
-msi/*.msi
-```
-
-### Linux
-
-```sh
-npm run tauri build
-```
-
-Les artefacts sont générés dans `src-tauri/target/release/bundle/`, notamment :
-
-```text
-appimage/*.AppImage
-deb/*.deb
-rpm/*.rpm
-```
-
-### Build frontend uniquement
-
-Pour vérifier le frontend sans compiler Tauri :
-
-```sh
-npm run build
-```
+- **Windows x64 :** NSIS `.exe` pour une installation par utilisateur (sans droits administrateur), et MSI par machine destiné notamment aux déploiements DSI (droits administrateur requis). Chaque variante crée un seul raccourci dans le menu Démarrer, sans raccourci bureau. Ne pas installer les deux variantes sur le même poste.
+- **macOS :** DMG Apple Silicon et Intel, contenant l'application et un alias vers `Applications` pour l'installation par glisser-déposer.
+- **Linux x64 :** paquet `.deb` Debian/Ubuntu, avec une seule entrée de lancement et une dépendance vers la bibliothèque système `libsqlite3-0`.
 
 ## Releases GitHub
 
-Le workflow `.github/workflows/release.yml` compile et publie les bundles suivants pour chaque tag `v*` :
+Le workflow `.github/workflows/release.yml` compile et publie les installateurs suivants pour chaque tag `v*` :
 
 - macOS Apple Silicon (`aarch64`)
 - macOS Intel (`x86_64`)
 - Windows x64 (`.exe` et `.msi`)
-- Linux x64 (`.deb`, `.rpm` et `.AppImage`)
+- Linux x64 (`.deb`)
 
-Pour publier une nouvelle release depuis `main` :
+Après synchronisation de la version du projet en `1.2.3`, publier le tag correspondant depuis `main` :
 
 ```sh
-git tag v1.1.0-beta.1
-git push origin v1.1.0-beta.1
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-Le workflow de release s'exécute pour tout tag `v*` et dérive le tag de release depuis la version de `package.json`, `Cargo.toml` et `tauri.conf.json`. La version actuelle est `v1.1.0-beta.1`, publiée comme pré-release. Le workflow peut aussi être lancé depuis l'onglet **Actions** de GitHub. Le workflow `.github/workflows/windows-release.yml` permet en plus de reconstruire uniquement l'installateur Windows et de le rattacher à une release existante en indiquant son tag, par exemple `v1.1.0-beta.1`.
+Le workflow vérifie que le tag SemVer `v...` correspond aux versions synchronisées du projet avant de construire les installateurs. Le workflow `.github/workflows/windows-release.yml`, lancé manuellement, peut reconstruire le `.exe` NSIS et le MSI pour une release existante ; il vérifie que les cinq installateurs multiplateformes sont présents. Les mises à jour MSI sont distribuées par la DSI ; le `.exe` NSIS est destiné aux installations par utilisateur.
 
-Les bundles publiés actuellement ne sont pas signés. macOS et Windows peuvent donc afficher un avertissement de sécurité au premier lancement.
+La signature/notarisation macOS et la signature Windows sont activées en CI si les secrets de certificat et de notarisation Apple sont configurés. Sans ces secrets, les installateurs ne sont pas signés et le système peut afficher un avertissement de sécurité au premier lancement.
 
 ### Autoriser l'application sur macOS
 
@@ -162,13 +95,15 @@ Pour supprimer ces avertissements automatiquement pour tous les utilisateurs, il
 
 ## Catalogue de tarifs et releases
 
-Le catalogue embarqué contient les tarifs API officiels relevés le 23 septembre 2026. La source déclarée est `src-tauri/catalog/pricing-source.json`. Les dates `effectiveFrom` sont les dates d'adoption du catalogue, faute de dates d'effet historiques publiées par les fournisseurs. Les tarifs sont ceux du standard short-context ; le tarif Google Gemini Pro correspond au palier `<=200k` tokens, car l'application ne connaît pas la taille du prompt, et les tarifs DeepSeek utilisent volontairement le palier peak. Pour préparer une release, le dépôt génère un catalogue temporaire, le valide avec le même validateur Rust que l'application, puis le remplace atomiquement uniquement après validation :
+Le catalogue embarqué contient les tarifs API officiels relevés le 23 septembre 2026. La source déclarée est `src-tauri/catalog/pricing-source.json` pendant la transition du validateur Rust. Les dates `effectiveFrom` sont les dates d'adoption du catalogue, faute de dates d'effet historiques publiées par les fournisseurs. Les tarifs sont ceux du standard short-context ; le tarif Google Gemini Pro correspond au palier `<=200k` tokens, car l'application ne connaît pas la taille du prompt, et les tarifs DeepSeek utilisent volontairement le palier peak. Pour préparer une release, le dépôt génère un catalogue temporaire, le valide avec l'ancien CLI Rust, puis remplace le catalogue embarqué atomiquement uniquement après validation. L'application .NET valide aussi le catalogue lors de son chargement à l'exécution :
+
+> Tant que le validateur historique du catalogue n'est pas porté en .NET, la préparation d'une release de tarifs nécessite aussi Rust stable. Rust n'est pas requis pour le développement ni les builds habituels de l'application.
 
 ```sh
 npm run release:prepare
 ```
 
-Une autre source locale peut être fournie explicitement avec `npm run release:prepare -- --source chemin/vers/source.json`. Une source absente, non parseable, vide, ambiguë ou incomplète fait échouer la commande sans remplacer le dernier catalogue valide. La CI exécute cette commande avant le bundle Tauri.
+Une autre source locale peut être fournie explicitement avec `npm run release:prepare -- --source chemin/vers/source.json`. Une source absente, non parseable, vide, ambiguë ou incomplète fait échouer la commande sans remplacer le dernier catalogue valide. La CI exécute cette commande avant les bundles Electron.
 
 > Un bundle macOS doit être construit **sur un Mac** ; un bundle Windows, **sur Windows**.
 
@@ -183,66 +118,24 @@ Au premier lancement, l'application utilise les chemins par défaut d'opencode (
 
 Si votre installation opencode utilise d'autres chemins, modifiez-les dans **Réglages** (icône ⚙ du header) via les boutons *Parcourir...*. Le choix est mémorisé dans `settings.json` (dossier de configuration de l'application).
 
-## Tests
+## Validation E2E
 
 ```sh
-# Tests backend (Rust) : coût, JSONC, configuration, agrégation, settings
-cd src-tauri && cargo test
-
-# Tests frontend (TypeScript) : filtrage + agrégations
-npm test
-
-# Tests E2E Playwright : frontend mock isolé, Chromium headless
 npx playwright install chromium
 npm run test:e2e
-
+npm run test:e2e:electron
+npm run test:e2e:packaged
 ```
 
-Pour le test d'acceptation, fournir un snapshot de la base et un CSV généré par le script legacy.
-
-Shells POSIX (macOS/Linux) :
-
-```sh
-cd src-tauri
-ACCEPTANCE_DB="/chemin/vers/opencode.db" \
-ACCEPTANCE_CSV="/chemin/vers/opencode-costs.csv" \
-cargo test --test acceptance_test -- --nocapture
-```
-
-PowerShell (Windows) :
-
-```powershell
-cd src-tauri
-$env:ACCEPTANCE_DB = "C:\chemin\vers\opencode.db"
-$env:ACCEPTANCE_CSV = "C:\chemin\vers\opencode-costs.csv"
-cargo test --test acceptance_test -- --nocapture
-```
-
-Les tests E2E démarrent automatiquement le frontend mock sur un port `127.0.0.1` libre avec `VITE_E2E=true`. Le launcher lit `e2e/fixtures/opencode-fixture.sql`, crée deux copies SQLite WASM isolées avec `sql.js`, génère les snapshots JSON par requêtes SQLite, puis transmet explicitement au serveur le manifeste, les snapshots, leurs chemins et leur hash via des variables d'environnement ; le mock charge le snapshot sélectionné comme source initiale. L'opération live `window.__E2E__.mutateSql()` exécute un INSERT dans la copie primaire, régénère son snapshot et déclenche le rechargement applicatif. Le changement de `dbPath` via `SettingsModal`/`save_settings` sélectionne le snapshot de la seconde copie. Aucun test ne lit ni n'écrit `opencode.db`. Le navigateur mock ne peut pas exécuter le vrai backend Tauri, SQLite ou watcher natif : ces tests valident la fixture SQLite WASM et le flux mock, tandis que l'exécution SQLite/watcher réelle est couverte par les tests Rust. Les scénarios initiaux sont sélectionnés par query string ; les changements live et de données passent par `window.__E2E__`, indisponible hors de ce mode. Le scénario `?e2e=no-settings` simule explicitement l'absence de configuration via l'erreur du mock, sans démarrer un backend Tauri réel.
-
-`npm run test:e2e` réserve automatiquement un port HTTP libre pour chaque exécution ; `E2E_PORT=4321 npm run test:e2e` permet d'imposer un port unique en CI ou pour le diagnostic. Le serveur de contrôle SQLite WASM utilise lui aussi un port attribué par le système, et les rapports/résultats sont rangés par port pour permettre deux exécutions concurrentes.
-Le `1422` éventuellement visible dans les exemples historiques n'est pas réservé : le runner dynamique est la configuration utilisée par `npm run test:e2e`.
-La configuration stable utilise `workers: 1` et `fullyParallel: false`, car les scénarios partagent le serveur mock d'une exécution. Une invocation directe `npx playwright test` doit fournir `E2E_PORT` (`E2E_PORT=4321 npx playwright test`) ; aucun port fixe de repli n'est accepté. `E2E_WORKERS=2 npm run test:e2e` est possible uniquement pour des fixtures explicitement isolées par test. La réservation du port applicatif précède le démarrage `webServer` de Playwright : une très petite fenêtre TOCTOU subsiste entre la fermeture de la réservation et le bind réel, tandis que le port de contrôle est choisi directement par le launcher au démarrage.
-
-`defaultPeriodDays` est borné à `1..3650` jours. Une valeur invalide est repliée à 30 jours dans le scénario mock E2E ; les règles de validation et le comportement SQLite/Tauri réels sont couverts côté Rust. Le scénario `?e2e=no-settings` représente un fichier absent : le mock renvoie `Settings::default()` sans diagnostic et sans persistance. Le scénario `?e2e=settings-invalid` reste dédié au JSON/configuration invalide. Les tests browser mock ne remplacent pas les tests Rust du watcher ni les tests IPC Tauri réels ; ils couvrent uniquement le frontend et son adaptateur mock.
+`test:e2e` vérifie le renderer dans un navigateur avec des fixtures SQLite WASM isolées. `test:e2e:electron` lance l'application Electron de développement avec le vrai backend .NET. `test:e2e:packaged` construit l'installateur de l'OS hôte et exécute les mêmes scénarios sur son bundle installé. Les scénarios natifs couvrent la lecture seule SQLite, les coûts, l'audit, les réglages, les dialogues, l'export et le mode live ; aucun ne lit ni ne modifie la base `opencode.db` d'un utilisateur.
 
 ## Structure
 
 ```
-src-tauri/          Backend Rust (Tauri 2)
-  src/
-    model.rs        Types partagés (SessionRecord, Settings, ...)
-    cost.rs         Calcul du coût par message
-    jsonc.rs        Suppression de commentaires + virgules finales (JSONC)
-    config.rs       Extraction des tarifs depuis opencode.jsonc
-    db.rs           Lecture de opencode.db (rusqlite, lecture seule)
-    aggregate.rs    Agrégation par session
-    settings.rs     Chargement/sauvegarde de settings.json
-    commands.rs     Commandes Tauri (get_data, get_settings, ...)
-    watcher.rs      Surveillance du fichier DB (mode live)
-src/                Frontend React + TypeScript + Vite
-  components/       Header, FilterBar, KpiCards, SessionTable, SettingsModal, charts/
-  lib/aggregate.ts  Filtrage + agrégations côté client
-  theme.ts          Thème adapté au système
-  api.ts            Client de l'API Tauri
+electron/             Processus main Electron, preload sécurisé, IPC, backend enfant
+src-dotnet/            Backend C# : SQLite, tarifs, coûts, audit, réglages, watcher
+src/                   Frontend React 19 + TypeScript + Vite
+  components/          Header, filtres, KPIs, tableau, modales, graphiques
+  app/                 Hooks de données, réglages, audit et mode live
+  api.ts               Adaptateur typé du preload Electron
 ```

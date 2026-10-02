@@ -1,0 +1,17 @@
+{
+  // Native backend E2E fixture covers JSONC comments and trailing commas.
+  "provider": {
+    "fixture-provider": {
+      "models": {
+        "fixture-model": {
+          "cost": {
+            "input": 1,
+            "output": 2,
+            "cache_read": 0.5,
+            "cache_write": 3,
+          },
+        },
+      },
+    },
+  },
+}

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { invoke } from "./tauri-mock";
+import { invoke } from "./desktop-mock";
 import { DEMO_AUDIT_REPORT } from "../demo/audit-fixture";
 import type { AuditReport, RuntimeMetrics } from "../types";
 
-describe("Tauri browser mock", () => {
+describe("browser desktop mock", () => {
   it("returns a deterministic demo recalculation result", async () => {
     const result = await invoke<{
       sessions: Array<{ models: Array<{ source: string }> }>;

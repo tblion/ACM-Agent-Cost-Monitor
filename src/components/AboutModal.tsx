@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "react-i18next";
 import licenseText from "../../LICENSE?raw";
 import { getFocusTrapTarget } from "../lib/rates";
@@ -14,11 +13,12 @@ export function AboutModal({ onClose }: { onClose: () => void }) {
     };
 
     try {
-      if (typeof openUrl !== "function") {
+      const openExternalUrl = window.desktopApi?.openExternalUrl;
+      if (!openExternalUrl) {
         fallback();
         return;
       }
-      void Promise.resolve(openUrl(url)).catch(fallback);
+      void Promise.resolve(openExternalUrl(url)).catch(fallback);
     } catch {
       fallback();
     }

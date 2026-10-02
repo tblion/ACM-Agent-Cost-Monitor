@@ -1,11 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
-import { invoke } from "@tauri-apps/api/core";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import contractFixture from "./fixtures/api-contract.json";
 import { decodeApiPayload, getLegacySettings, getSettings, getSettingsStatus, invokeCommand } from "./api";
 import type { ApiCommandMap } from "./api";
+import type { DesktopApi } from "../electron/renderer-api";
 import type { ApiError, Settings, SettingsResponse } from "./types";
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+const desktopApi = {
+  getData: vi.fn(),
+  getSettings: vi.fn(),
+  getSettingsStatus: vi.fn(),
+  getRuntimeMetrics: vi.fn(),
+  saveSettings: vi.fn(),
+  exportAuditReport: vi.fn(),
+} as unknown as DesktopApi;
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  Object.defineProperty(window, "desktopApi", { configurable: true, value: desktopApi });
+});
 
 const settings: Settings = {
   dbPath: null,
@@ -36,22 +48,21 @@ describe("SettingsResponse contract", () => {
   });
 
   it("uses the status command for the frontend while preserving the legacy command", async () => {
-    const mockedInvoke = vi.mocked(invoke);
-    mockedInvoke.mockResolvedValueOnce({ settings, diagnostic: null, liveActive: false } as never);
-    mockedInvoke.mockResolvedValueOnce(settings as never);
+    vi.mocked(desktopApi.getSettingsStatus).mockResolvedValueOnce({ settings, diagnostic: null, liveActive: false } as never);
+    vi.mocked(desktopApi.getSettings).mockResolvedValueOnce(settings as never);
 
     await getSettingsStatus();
     await getLegacySettings();
 
-    expect(mockedInvoke.mock.calls).toEqual([["get_settings_status"], ["get_settings"]]);
+    expect(desktopApi.getSettingsStatus).toHaveBeenCalledOnce();
+    expect(desktopApi.getSettings).toHaveBeenCalledOnce();
   });
 
   it("keeps getSettings as the legacy Settings-only wrapper", async () => {
-    const mockedInvoke = vi.mocked(invoke);
-    mockedInvoke.mockResolvedValueOnce(settings as never);
+    vi.mocked(desktopApi.getSettings).mockResolvedValueOnce(settings as never);
 
     await expect(getSettings()).resolves.toEqual(settings);
-    expect(mockedInvoke).toHaveBeenCalledWith("get_settings");
+    expect(desktopApi.getSettings).toHaveBeenCalledOnce();
   });
 });
 
@@ -77,7 +88,7 @@ describe("public API payload contract", () => {
       invokeCommand("get_runtime_metrics");
       // @ts-expect-error unknown runtime argument fields are rejected
       invokeCommand("get_runtime_metrics", { includeDatabaseSize: true, extra: false });
-      // @ts-expect-error save_settings uses the exact Tauri {s} payload
+      // @ts-expect-error save_settings uses the exact {s} payload
       invokeCommand("save_settings", settings);
       // @ts-expect-error export payload requires both exact fields
       invokeCommand("export_audit_report", { content: "{}" });
