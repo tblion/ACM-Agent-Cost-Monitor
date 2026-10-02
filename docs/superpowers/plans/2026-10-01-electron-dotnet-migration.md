@@ -464,6 +464,8 @@ Build release candidates on all OS runners. The release matrix verifies the inst
 
 ## Task 12: Retire Tauri and Rust after parity sign-off
 
+**Sequencing note:** The owner requested removing Tauri and Rust before Windows/Linux packaged-install validation is available. Remove the legacy runtime now, but keep the release completion gate open until all platform installers have passed their CI scenarios.
+
 **Files:**
 - Delete: `src-tauri/`
 - Modify: `package.json`
@@ -478,11 +480,11 @@ Build release candidates on all OS runners. The release matrix verifies the inst
 
 Before removal, require green packaged E2E for database read-only behavior, cost parity, settings, audit, export, live mode, and installation/upgrade on the supported platforms. Require all release artifacts: Windows NSIS, Windows MSI, macOS Apple Silicon DMG, macOS Intel DMG, and Linux x64 `.deb`.
 
-- [ ] **Step 2: Remove Tauri runtime references**
+- [x] **Step 2: Remove Tauri runtime references**
 
 Remove `@tauri-apps/api`, Tauri CLI/configuration, Rust setup from CI, `src-tauri/`, and stale Tauri-only mocks after a repository-wide search confirms the active application and documentation no longer depend on them.
 
-- [ ] **Step 3: Run final build and required E2E validation**
+- [x] **Step 3: Run final build and required E2E validation**
 
 Run: `npm ci`
 
@@ -503,4 +505,4 @@ Expected: a clean install, frontend build, browser mock scenarios, and Electron-
 - Windows delivers NSIS per-user and MSI per-machine, each with one Start Menu shortcut.
 - macOS delivers Apple Silicon and Intel DMGs with an Applications alias.
 - Linux delivers one Debian/Ubuntu `.deb` with one app launcher.
-- The old Tauri/Rust code is not removed until packaged E2E and release artifacts prove the replacement.
+- Release completion remains blocked until packaged E2E and release artifacts prove the replacement on every supported platform.

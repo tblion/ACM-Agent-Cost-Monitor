@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { DEMO_AUDIT_REPORT } from "./audit-fixture";
 import type { AuditReport } from "../types";
 
-const referenceExpectedUrl = new URL("../../src-tauri/tests/fixtures/audit/reference-expected.json", import.meta.url);
+const referenceExpectedUrl = new URL("../fixtures/audit/reference-expected.json", import.meta.url);
 
 function stableProjection(report: AuditReport) {
   // Paths and generation timestamp are execution-specific metadata.
@@ -42,7 +42,7 @@ function stableProjection(report: AuditReport) {
 }
 
 describe("demo audit fixture", () => {
-  it("stays in parity with the Rust reference oracle for stable fields", () => {
+  it("stays in parity with the checked-in reference oracle for stable fields", () => {
     const expected = JSON.parse(readFileSync(referenceExpectedUrl, "utf8")) as AuditReport;
 
     expect(stableProjection(DEMO_AUDIT_REPORT)).toEqual(stableProjection(expected));

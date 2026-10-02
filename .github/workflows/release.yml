@@ -70,9 +70,6 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Setup Rust catalog validator
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install Linux SQLite runtime
         if: runner.os == 'Linux'
         run: |

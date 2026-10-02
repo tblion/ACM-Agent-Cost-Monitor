@@ -114,6 +114,7 @@ button:disabled, input:disabled, select:disabled {
   border-bottom: 1px solid var(--border);
 }
 .header-identity { display: flex; align-items: center; gap: 10px; min-width: max-content; }
+.header-logo { display: block; width: 32px; height: 32px; flex: 0 0 auto; object-fit: contain; }
 .header-runtime { display: flex; justify-content: flex-end; gap: 18px; min-width: 0; color: var(--muted); font-size: 11px; }
 .header-runtime-item { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; }
 .header-runtime-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

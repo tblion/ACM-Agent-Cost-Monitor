@@ -95,9 +95,7 @@ To remove these warnings automatically for all users, the application must be si
 
 ## Pricing catalog and releases
 
-The embedded catalog contains official API rates collected on September 23, 2026. The declared source is `src-tauri/catalog/pricing-source.json` during the Rust validator transition. `effectiveFrom` dates are the catalog adoption dates because providers do not publish historical effective dates. Rates use the standard short-context tier; the Google Gemini Pro rate uses the `<=200k` token tier because the application does not know prompt size, and DeepSeek rates intentionally use the peak tier. To prepare a release, the repository generates a temporary catalog, validates it with the legacy Rust CLI, and replaces the embedded catalog atomically only after validation. The .NET application validates the catalog again when loading it at runtime:
-
-> Until the historical catalog validator is ported to .NET, preparing a pricing release also requires the stable Rust toolchain. Rust is not needed for normal development or application builds.
+The embedded catalog contains official API rates collected on September 23, 2026. Its source and generated form live in `src-dotnet/Resources/`. `effectiveFrom` dates are the catalog adoption dates because providers do not publish historical effective dates. Rates use the standard short-context tier; the Google Gemini Pro rate uses the `<=200k` token tier because the application does not know prompt size, and DeepSeek rates intentionally use the peak tier. To prepare a release, the repository generates a temporary catalog, validates it with the .NET backend, and replaces the embedded catalog atomically only after validation. The application validates the catalog again when loading it at runtime:
 
 ```sh
 npm run release:prepare

@@ -13,7 +13,7 @@
     <PackageReference Include="SQLitePCLRaw.provider.sqlite3" Version="2.1.11" />
     <PackageReference Include="SQLitePCLRaw.provider.winsqlite3" Version="2.1.11" />
     <Compile Remove="PackagingProbe/**/*.cs" />
-    <EmbeddedResource Include="../src-tauri/catalog/pricing.json">
+    <EmbeddedResource Include="Resources/pricing.json">
       <LogicalName>OpencodeCostsViewer.Backend.Resources.pricing.json</LogicalName>
     </EmbeddedResource>
   </ItemGroup>

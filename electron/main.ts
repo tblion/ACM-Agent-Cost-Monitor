@@ -142,6 +142,12 @@ function createMainWindow(): void {
     width: 1100,
     height: 760,
     show: false,
+    icon: path.join(
+      rootDirectory,
+      "assets",
+      "icons",
+      process.platform === "win32" ? "icon.ico" : "icon.png",
+    ),
     webPreferences: {
       preload: path.join(rootDirectory, "dist-electron", "preload.cjs"),
       contextIsolation: true,
@@ -250,6 +256,10 @@ app.on("before-quit", (event) => {
 });
 
 void app.whenReady().then(async () => {
+  if (process.platform === "darwin") {
+    app.dock?.setIcon(path.join(rootDirectory, "assets", "icons", "icon.png"));
+  }
+
   try {
     await backend.start();
   } catch (error) {

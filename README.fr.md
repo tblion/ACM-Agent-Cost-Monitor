@@ -95,9 +95,7 @@ Pour supprimer ces avertissements automatiquement pour tous les utilisateurs, il
 
 ## Catalogue de tarifs et releases
 
-Le catalogue embarqué contient les tarifs API officiels relevés le 23 septembre 2026. La source déclarée est `src-tauri/catalog/pricing-source.json` pendant la transition du validateur Rust. Les dates `effectiveFrom` sont les dates d'adoption du catalogue, faute de dates d'effet historiques publiées par les fournisseurs. Les tarifs sont ceux du standard short-context ; le tarif Google Gemini Pro correspond au palier `<=200k` tokens, car l'application ne connaît pas la taille du prompt, et les tarifs DeepSeek utilisent volontairement le palier peak. Pour préparer une release, le dépôt génère un catalogue temporaire, le valide avec l'ancien CLI Rust, puis remplace le catalogue embarqué atomiquement uniquement après validation. L'application .NET valide aussi le catalogue lors de son chargement à l'exécution :
-
-> Tant que le validateur historique du catalogue n'est pas porté en .NET, la préparation d'une release de tarifs nécessite aussi Rust stable. Rust n'est pas requis pour le développement ni les builds habituels de l'application.
+Le catalogue embarqué contient les tarifs API officiels relevés le 23 septembre 2026. Sa source et sa version générée se trouvent dans `src-dotnet/Resources/`. Les dates `effectiveFrom` sont les dates d'adoption du catalogue, faute de dates d'effet historiques publiées par les fournisseurs. Les tarifs sont ceux du standard short-context ; le tarif Google Gemini Pro correspond au palier `<=200k` tokens, car l'application ne connaît pas la taille du prompt, et les tarifs DeepSeek utilisent volontairement le palier peak. Pour préparer une release, le dépôt génère un catalogue temporaire, le valide avec le backend .NET, puis ne remplace le catalogue embarqué atomiquement qu'après validation. L'application valide aussi le catalogue lors de son chargement à l'exécution :
 
 ```sh
 npm run release:prepare

@@ -184,7 +184,7 @@ test("reports release validator launch and exit errors", async () => {
       () => runPricingValidator(join(directory, "catalog.json"), {
         command: join(directory, "missing-validator"),
       }),
-      /cannot launch pricing validator/,
+      /cannot launch .NET pricing validator/,
     );
 
     assert.throws(
@@ -198,7 +198,7 @@ test("reports release validator launch and exit errors", async () => {
 });
 
 test("release command preserves the catalog when source loading fails", async () => {
-  const catalogPath = join(root, "src-tauri", "catalog", "pricing.json");
+  const catalogPath = join(root, "src-dotnet", "Resources", "pricing.json");
   const before = await readFile(catalogPath, "utf8");
   const result = spawnSync(process.execPath, [release, "--source", join(root, "missing-pricing-source.json")], {
     cwd: root,
@@ -218,6 +218,34 @@ test("release command rejects an output override", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /does not accept '--output'/i);
+});
+
+test("the .NET pricing validator accepts valid catalogs and rejects invalid catalogs", async () => {
+  await withTempDirectory(async (directory) => {
+    const validatorProject = join(root, "src-dotnet", "OpencodeCostsViewer.Backend.csproj");
+    const validCatalog = join(root, "src-dotnet", "Resources", "pricing.json");
+    const invalidCatalog = join(directory, "invalid-pricing.json");
+    await writeFile(invalidCatalog, "not JSON");
+
+    const runValidator = (catalogPath) => spawnSync("dotnet", [
+      "run",
+      "--project",
+      validatorProject,
+      "--configuration",
+      "Release",
+      "--",
+      "--validate-pricing",
+      catalogPath,
+    ], { cwd: root, encoding: "utf8" });
+
+    const valid = runValidator(validCatalog);
+    assert.equal(valid.status, 0, valid.stderr);
+    assert.match(valid.stdout, /pricing catalog is valid/i);
+
+    const invalid = runValidator(invalidCatalog);
+    assert.notEqual(invalid.status, 0);
+    assert.match(invalid.stderr, /invalid pricing catalog/i);
+  });
 });
 
 test("atomic replacement removes its temporary file after replacement failure", async () => {

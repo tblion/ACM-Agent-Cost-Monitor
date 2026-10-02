@@ -6,12 +6,20 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { generateCatalogFile, writeCatalogAtomically, parseArguments } from "./generate-pricing.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const catalog = join(root, "src-tauri", "catalog", "pricing.json");
+const catalog = join(root, "src-dotnet", "Resources", "pricing.json");
 
 export function runPricingValidator(catalogPath, {
-  cwd = join(root, "src-tauri"),
-  command = "cargo",
-  args = ["run", "--locked", "--bin", "validate_pricing", "--"],
+  cwd = root,
+  command = "dotnet",
+  args = [
+    "run",
+    "--project",
+    join(root, "src-dotnet", "OpencodeCostsViewer.Backend.csproj"),
+    "--configuration",
+    "Release",
+    "--",
+    "--validate-pricing",
+  ],
 } = {}) {
   const validation = spawnSync(command, [...args, catalogPath], {
     cwd,
@@ -19,10 +27,10 @@ export function runPricingValidator(catalogPath, {
     stdio: "inherit",
   });
   if (validation.error) {
-    throw new Error(`cannot launch pricing validator '${command}': ${validation.error.message}`);
+    throw new Error(`cannot launch .NET pricing validator '${command}': ${validation.error.message}`);
   }
   if (validation.status !== 0) {
-    throw new Error(`pricing validator '${command}' exited with code ${validation.status}`);
+    throw new Error(`.NET pricing validator '${command}' exited with code ${validation.status}`);
   }
   return validation;
 }

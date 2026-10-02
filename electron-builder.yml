@@ -2,12 +2,14 @@ appId: com.fcpb6403.opencode-costs-viewer
 productName: Opencode Costs Viewer
 asar: true
 directories:
-  buildResources: src-tauri/icons
+  buildResources: assets/icons
   output: release
 files:
   - dist-electron/**/*
   - dist-electron-renderer/**/*
   - package.json
+  - assets/icons/icon.png
+  - assets/icons/icon.ico
 extraResources:
   - from: src-dotnet/publish/backend
     to: backend
@@ -15,7 +17,7 @@ extraResources:
       - "**/*"
       - "!**/*.pdb"
 win:
-  icon: src-tauri/icons/icon.ico
+  icon: assets/icons/icon.ico
   target:
     - nsis
     - msi
@@ -35,7 +37,7 @@ msi:
   shortcutName: Opencode Costs Viewer
   runAfterFinish: false
 mac:
-  icon: src-tauri/icons/icon.icns
+  icon: assets/icons/icon.icns
   target:
     - dmg
 dmg:
@@ -48,7 +50,7 @@ dmg:
       type: link
       path: /Applications
 linux:
-  icon: src-tauri/icons/128x128.png
+  icon: assets/icons/128x128.png
   executableName: opencode-costs-viewer
   category: Utility
   target:

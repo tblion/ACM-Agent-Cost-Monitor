@@ -23,7 +23,6 @@
     "desktop:package": "npm run electron:build:desktop && npm run desktop:publish-backend && node scripts/run-electron-builder.mjs --publish never",
     "test:e2e:packaged": "npm run desktop:package && node scripts/run-packaged-electron-e2e.mjs",
     "preview": "vite preview",
-    "tauri": "tauri",
     "test": "vitest run --exclude 'e2e/**'",
     "test:e2e": "node e2e/run-playwright.mjs",
     "test:e2e:electron": "dotnet build src-dotnet/OpencodeCostsViewer.Backend.csproj -c Release && npm run electron:build:desktop && cross-env E2E_ELECTRON=true node e2e/run-playwright.mjs",
@@ -33,9 +32,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@tauri-apps/api": "^2.12.1",
-    "@tauri-apps/cli": "^2",
-    "@tauri-apps/plugin-opener": "^2.7.0",
     "@types/node": "^26.6.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

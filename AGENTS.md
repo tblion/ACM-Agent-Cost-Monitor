@@ -13,8 +13,7 @@ Application desktop Electron/React 19 avec un backend .NET 10/C#. Electron main 
 - `dotnet build src-dotnet/OpencodeCostsViewer.Backend.csproj -c Release` compile le backend.
 - `npm run test:e2e` valide les scénarios navigateur mockés ; `npm run test:e2e:electron` lance Electron avec le vrai backend et une base fixture isolée ; `npm run test:e2e:packaged` construit le bundle de l'OS hôte et le teste.
 - `npm run test:release` teste le générateur de catalogue sans remplacer le catalogue embarqué.
-- `npm run release:prepare` génère un catalogue temporaire, le valide via le binaire Rust `validate_pricing`, puis le remplace atomiquement. Cette étape sera portée en .NET avant la suppression de `src-tauri/`. Une source alternative se passe avec `-- --source chemin/vers/source.json`.
-- Rust stable reste nécessaire temporairement pour `release:prepare` uniquement ; le développement et les builds desktop ordinaires utilisent Node.js et le SDK .NET.
+- `npm run release:prepare` génère un catalogue temporaire, le valide avec le backend .NET, puis le remplace atomiquement. Une source alternative se passe avec `-- --source chemin/vers/source.json`.
 
 ## Releases multiplateformes
 
@@ -26,7 +25,7 @@ Chaque version publiée doit fournir des installateurs pour les trois familles d
 
 Checklist obligatoire pour chaque release :
 
-1. Utiliser une version SemVer sans préfixe dans les fichiers (`1.0.0`) et un tag Git conventionnel avec préfixe (`v1.0.0`). Synchroniser `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` et `src-tauri/tauri.conf.json` tant que le validateur historique de catalogue est encore dans `src-tauri/`.
+1. Utiliser une version SemVer sans préfixe dans `package.json` et `package-lock.json` (`1.0.0`) et un tag Git conventionnel avec préfixe (`v1.0.0`).
 2. Pousser le tag et attendre la fin du workflow `Release desktop bundles`.
 3. Vérifier sur GitHub les cinq installateurs : NSIS `.exe`, MSI, DMG Apple Silicon, DMG Intel et Linux `.deb`.
 4. Ne pas annoncer la release comme complète tant que les quatre jobs de bundles (Windows, macOS Apple Silicon, macOS Intel et Linux) ne sont pas verts et que les cinq assets sont présents. Le workflow échoue si un format/architecture manque.
@@ -38,7 +37,7 @@ Commande de contrôle : `gh release view vX.Y.Z --repo tblion/OpencodeCostsViewe
 - `src-dotnet/Infrastructure/OpencodeDatabase.cs` ouvre `opencode.db` en lecture seule (`Microsoft.Data.Sqlite.Core`, `Mode=ReadOnly`) ; aucune migration, écriture ou réécriture de cette base n'est permise.
 - Les chemins OpenCode suivent XDG sur tous les OS : `$XDG_DATA_HOME/opencode/opencode.db` ou `~/.local/share/opencode/opencode.db`, et `$XDG_CONFIG_HOME/opencode/opencode.jsonc` ou `~/.config/opencode/opencode.jsonc`. Ne pas remplacer cela par `dirs::data_dir()` ou `dirs::config_dir()`.
 - `opencode.jsonc` accepte commentaires et virgules finales ; `src-dotnet/Infrastructure/JsoncReader.cs` les retire avant le parsing JSON.
-- Le catalogue `src-tauri/catalog/pricing.json` (source transitoire, embarquée comme ressource .NET) est versionné par provider, modèle et `effectiveFrom`; le calcul historique prend le dernier tarif applicable à la date du message.
+- Le catalogue `src-dotnet/Resources/pricing.json` est versionné par provider, modèle et `effectiveFrom`; le calcul historique prend le dernier tarif applicable à la date du message.
 - Le raisonnement est facturé au tarif `output` dans `src-dotnet/Application/CostCalculator.cs`.
 - SQLite utilise le provider système (`winsqlite3` sous Windows, `sqlite3` sous macOS/Linux), sans bundle natif `e_sqlite3`; le `.deb` dépend de `libsqlite3-0`.
 - Le renderer n'a aucun accès direct à Node.js : toutes les capacités desktop passent par l'API nommée du preload Electron.

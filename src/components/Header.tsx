@@ -4,6 +4,7 @@ import type { RefObject } from "react";
 import { formatDateTime } from "../i18n/format";
 import { languageLocale, resolveLanguage } from "../i18n/locale";
 import type { RuntimeMetrics } from "../types";
+import appLogoUrl from "../../assets/icons/icon.png";
 
 const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB"] as const;
 
@@ -52,7 +53,7 @@ export function Header({ live, liveConfigured, liveActive, liveAvailable, liveSa
   return (
     <header className="app-header">
       <div className="header-identity">
-        <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg,var(--accent),#22d3ee)" }} aria-hidden />
+        <img className="header-logo" src={appLogoUrl} alt="" width={32} height={32} />
         <span style={{ fontWeight: 600, fontSize: 15 }}>{t("header.brand")}</span>
       </div>
       <div className="header-runtime" aria-label={t("status.label")}>
