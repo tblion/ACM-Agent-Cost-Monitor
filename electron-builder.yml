@@ -1,5 +1,5 @@
-appId: com.fcpb6403.opencode-costs-viewer
-productName: Opencode Costs Viewer
+appId: com.fcpb6403.acm-agent-cost-monitor
+productName: ACM Agent Cost Monitor
 asar: true
 directories:
   buildResources: assets/icons
@@ -26,7 +26,7 @@ nsis:
   perMachine: false
   createDesktopShortcut: false
   createStartMenuShortcut: true
-  shortcutName: Opencode Costs Viewer
+  shortcutName: ACM Agent Cost Monitor
   deleteAppDataOnUninstall: false
 msi:
   oneClick: true
@@ -34,7 +34,7 @@ msi:
   upgradeCode: "{CCC7CE0A-1B08-4CF1-9A31-2DAA5385CD29}"
   createDesktopShortcut: false
   createStartMenuShortcut: true
-  shortcutName: Opencode Costs Viewer
+  shortcutName: ACM Agent Cost Monitor
   runAfterFinish: false
 mac:
   icon: assets/icons/icon.icns
@@ -51,7 +51,7 @@ dmg:
       path: /Applications
 linux:
   icon: assets/icons/128x128.png
-  executableName: opencode-costs-viewer
+  executableName: acm-agent-cost-monitor
   category: Utility
   target:
     - deb

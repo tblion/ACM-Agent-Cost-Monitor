@@ -1,8 +1,8 @@
-# Opencode Costs Viewer
+# ACM Agent Cost Monitor
 
 [Français](README.fr.md)
 
-Desktop application for Windows, macOS, and Linux that calculates the token and dollar cost of each **opencode** session and project from the local `opencode.db` database. It replaces the legacy PowerShell script `Get-OpencodeSessionCosts.ps1` (kept in `_old/`).
+Desktop application for Windows, macOS, and Linux, designed to track the cost and token usage of AI coding agents. **The current release supports OpenCode only**: it reads sessions from the local `opencode.db` database. Claude Code, Cline, Kilo Code, and other agents are not supported yet.
 
 Unlike the script, it provides a graphical interface with filters, charts, a sortable table, live mode, and persistent settings.
 
@@ -11,11 +11,24 @@ Unlike the script, it provides a graphical interface with filters, charts, a sor
 - **KPIs**: total cost, tokens, number of sessions (including subagents), and number of projects for the filtered period.
 - **Filters**: by project, model, provider, and date range.
 - **Charts**: cost over time, by project, model, and provider; token breakdown; most expensive sessions; and cost by project group (automatic parent folder plus custom groups).
+- **Audit**: trace which database rows, rates, and token counts produced the displayed totals.
 - **Session table**: sortable by date or cost, with a `rate ✓` badge (custom rate applied) or `cost 0` (local/free model, reported but not hidden).
 - **Live mode**: the `LIVE` button in the header enables automatic updates as soon as the opencode database changes (file watching with debounce).
-- **Persistent settings**: database and configuration paths, theme (system/light/dark), default period, and custom project groups. Saved in `settings.json`.
+- **Persistent settings**: database and rates configuration paths, theme (system/light/dark), interface language, default period, and custom project groups. Saved separately from OpenCode's database.
 
-Costs are recalculated with the custom rates from `opencode.jsonc` (`provider.<id>.models.<model>.cost`); otherwise, the cost already stored by opencode is used. Reasoning tokens are charged at the `output` rate.
+## Cost calculation and data handling
+
+For each assistant message, the application chooses a rate in this order:
+
+1. A custom rate in `opencode.jsonc` (`provider.<id>.models.<model>.cost`).
+2. The embedded pricing catalog, using the rate effective on the message date.
+3. The cost already stored by OpenCode when no rate can be resolved.
+
+Input, output, cache-read, and cache-write tokens are priced separately. Reasoning tokens use the `output` rate. Calculations run locally; the app does not need provider API keys or query model APIs. The OpenCode database is opened read-only and is never migrated or rewritten. The app writes its own settings and user-requested exports only.
+
+## Download
+
+Choose the installer for your operating system from [GitHub Releases](https://github.com/tblion/OpencodeCostsViewer/releases). Installers include the .NET backend, so end users do not need Node.js or .NET. Supported packages are Windows x64 (NSIS `.exe` and MSI), macOS Apple Silicon/Intel (DMG), and Linux x64 (`.deb`).
 
 ## Prerequisites
 
@@ -33,7 +46,7 @@ sudo apt install libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils \
 
 End-user installers include a self-contained .NET backend; users do not need Node.js or .NET installed.
 
-## Installation
+## Development setup
 
 ```sh
 git clone https://github.com/tblion/OpencodeCostsViewer.git
@@ -48,6 +61,15 @@ npm run electron:dev
 ```
 
 `electron:dev` starts Vite, builds the Electron main/preload processes, builds the .NET backend, and opens the desktop window. `npm run build` checks only the React renderer. `npm run desktop:package` builds the installer for the current host OS.
+
+For browser-only development with demo data, use `npm run dev:mock` (port 1421). Other useful commands:
+
+| Command | Purpose |
+|---|---|
+| `npm run build` | Type-check and build the React renderer. |
+| `npm run electron:build:desktop` | Build the renderer, Electron main/preload, and type-check Electron code. |
+| `npm run desktop:package` | Package the application for the current OS. |
+| `npm run release:prepare` | Generate and validate the embedded pricing catalog. |
 
 Each platform produces its own installer:
 
@@ -79,14 +101,14 @@ macOS signing/notarization and Windows signing are enabled in CI when their cert
 
 After downloading the DMG:
 
-1. Open the DMG and drag `Opencode Costs Viewer.app` to **Applications**.
+1. Open the DMG and drag `ACM Agent Cost Monitor.app` to **Applications**.
 2. Right-click the application, choose **Open**, then confirm **Open**.
 3. If macOS still blocks the application, open **System Settings -> Privacy & Security** and click **Open Anyway**.
 
 If macOS reports that “the application is damaged and cannot be opened”, remove only the quarantine attribute from the application copied to Applications:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/Opencode Costs Viewer.app"
+xattr -dr com.apple.quarantine "/Applications/ACM Agent Cost Monitor.app"
 ```
 
 Then relaunch the application. This command bypasses macOS download protection; use it only for a bundle from this repository or a trusted release. It does not repair a genuinely corrupted binary or sign the application.
@@ -123,17 +145,32 @@ npx playwright install chromium
 npm run test:e2e
 npm run test:e2e:electron
 npm run test:e2e:packaged
+npm run test:release
 ```
 
 `test:e2e` exercises the browser demo with isolated SQLite WASM fixtures. `test:e2e:electron` launches the development Electron app with the real .NET backend. `test:e2e:packaged` builds the host installer and runs the same scenarios against its packaged application bundle. The native scenarios cover read-only database behavior, costs, audit, settings, file dialogs, export, and live mode; none reads or modifies a user's `opencode.db`.
 
-## Structure
+## Technology stack and architecture
+
+- **UI:** React 19, TypeScript, Vite, Recharts, and i18next (English/French).
+- **Desktop shell:** Electron with context isolation, a sandboxed preload, and no direct Node.js access from the renderer.
+- **Backend:** .NET 10 / C#, launched and supervised by Electron main. Requests and responses use JSON Lines over standard input/output.
+- **Storage:** SQLite through the operating system's SQLite library (`winsqlite3` on Windows, `sqlite3` on macOS/Linux). The OpenCode database is read-only; app settings are stored separately.
+- **Validation:** Playwright E2E tests against the browser mock, the real Electron/.NET app, and the packaged desktop app.
+
+```text
+React renderer -> typed preload API -> Electron IPC -> .NET backend
+                                                    -> OpenCode SQLite (read-only)
+                                                    -> OpenCode JSONC rates
+                                                    -> embedded historical rate catalog
+```
+
+## Repository structure
 
 ```
-electron/            Electron main, sandboxed preload, IPC, and backend process
-src-dotnet/           C# backend: SQLite, pricing, costs, audit, settings, watcher
-src/                  React 19 + TypeScript + Vite frontend
-  components/         Header, filters, KPIs, session table, modals, charts
-  app/                Data, settings, audit, and live-mode hooks
-  api.ts              Typed Electron preload adapter
+electron/             Electron main, sandboxed preload, IPC, backend lifecycle
+src-dotnet/           .NET backend: SQLite, pricing, costs, audit, settings, watcher
+src/                  React renderer, UI components, app hooks, and typed API adapter
+e2e/                  Playwright scenarios and isolated database fixtures
+scripts/              Packaging, release, and installer-validation helpers
 ```

@@ -25,7 +25,7 @@ function Get-ProductShortcuts {
     ) | Where-Object { Test-Path $_ }
     return @($startMenus | ForEach-Object {
         Get-ChildItem -Path $_ -Filter "*.lnk" -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.BaseName -eq "Opencode Costs Viewer" }
+            Where-Object { $_.BaseName -eq "ACM Agent Cost Monitor" }
     })
 }
 
@@ -38,7 +38,7 @@ function Assert-ShortcutState([int]$expectedStartMenuCount) {
         Where-Object { Test-Path $_ }
     $desktopShortcuts = @($desktopRoots | ForEach-Object {
         Get-ChildItem -Path $_ -Filter "*.lnk" -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.BaseName -eq "Opencode Costs Viewer" }
+            Where-Object { $_.BaseName -eq "ACM Agent Cost Monitor" }
     })
     if ($desktopShortcuts.Count -ne 0) { throw "Installer created an unexpected desktop shortcut." }
 }
@@ -61,8 +61,8 @@ $msiInstaller = Get-ChildItem -Path $releaseDirectory -Filter "*.msi" -File | Se
 if ($null -eq $nsisInstaller) { throw "NSIS installer was not generated." }
 if ($null -eq $msiInstaller) { throw "MSI installer was not generated." }
 
-$nsisInstallDirectory = Join-Path $env:LOCALAPPDATA "Programs\opencode-costs-viewer"
-$msiInstallDirectory = Join-Path $env:RUNNER_TEMP "opencode-costs-viewer-msi-install"
+$nsisInstallDirectory = Join-Path $env:LOCALAPPDATA "Programs\acm-agent-cost-monitor"
+$msiInstallDirectory = Join-Path $env:RUNNER_TEMP "acm-agent-cost-monitor-msi-install"
 $settingsDirectory = Join-Path $env:APPDATA "com.fcpb6403.opencode-costs-viewer"
 New-Item -ItemType Directory -Path $settingsDirectory -Force | Out-Null
 $settingsMarker = Join-Path $settingsDirectory "installer-upgrade-marker.txt"

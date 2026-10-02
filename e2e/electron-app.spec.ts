@@ -59,6 +59,8 @@ test.beforeEach(async () => {
   page.on("console", message => console.log(`[Electron renderer ${message.type()}] ${message.text()}`));
   page.on("pageerror", error => console.error(`[Electron renderer error] ${error.message}`));
   await page.waitForLoadState("domcontentloaded");
+  await expect(page).toHaveTitle("ACM Agent Cost Monitor");
+  await expect(page.getByRole("banner")).toContainText("ACM Agent Cost Monitor");
   const settingsButton = page.getByRole("button", { name: /Réglages|Settings/ });
   await expect(settingsButton, `Electron page URL=${page.url()} title=${await page.title()} body=${await page.locator("body").innerText()}`).toBeVisible();
   await expect(page.getByRole("cell", { name: "Native fixture parent" })).toBeVisible();

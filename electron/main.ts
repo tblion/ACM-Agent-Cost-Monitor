@@ -8,7 +8,8 @@ import { IPC_CHANNELS } from "./ipc-contract";
 import type { IpcResult } from "./ipc-contract";
 import type { ApiError } from "../src/types";
 
-const applicationIdentifier = "com.fcpb6403.opencode-costs-viewer";
+const applicationName = "ACM Agent Cost Monitor";
+const legacyApplicationIdentifier = "com.fcpb6403.opencode-costs-viewer";
 const backendOperations = new Set([
   "get_data",
   "get_cost_summary",
@@ -27,8 +28,9 @@ const maximumAuditExportBytes = 128 * 1024 * 1024;
 const configuredSettingsDirectory = process.env.OPENCODE_COSTS_VIEWER_SETTINGS_DIR;
 app.setPath(
   "userData",
-  configuredSettingsDirectory || path.join(app.getPath("appData"), applicationIdentifier),
+  configuredSettingsDirectory || path.join(app.getPath("appData"), legacyApplicationIdentifier),
 );
+app.setName(applicationName);
 
 let mainWindow: BrowserWindow | null = null;
 let startupFailure: ApiError | null = null;
@@ -138,7 +140,7 @@ function createMainWindow(): void {
   const rendererFile = path.join(rootDirectory, "dist-electron-renderer", "index.html");
   const developmentUrl = process.env.VITE_DEV_SERVER_URL;
   mainWindow = new BrowserWindow({
-    title: "Opencode Costs Viewer",
+    title: applicationName,
     width: 1100,
     height: 760,
     show: false,

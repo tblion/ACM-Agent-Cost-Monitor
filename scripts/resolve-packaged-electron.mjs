@@ -16,10 +16,10 @@ console.log(executable);
 
 function resolveExecutable() {
   if (platform === "win32") {
-    return path.join(releaseDirectory, "win-unpacked", "Opencode Costs Viewer.exe");
+    return path.join(releaseDirectory, "win-unpacked", "ACM Agent Cost Monitor.exe");
   }
   if (platform === "linux") {
-    return path.join(releaseDirectory, "linux-unpacked", "opencode-costs-viewer");
+    return path.join(releaseDirectory, "linux-unpacked", "acm-agent-cost-monitor");
   }
   if (platform === "darwin") {
     const architectures = arch === "arm64" ? ["mac-arm64", "mac"] : ["mac", "mac-x64"];
@@ -27,10 +27,10 @@ function resolveExecutable() {
       const candidate = path.join(
         releaseDirectory,
         directory,
-        "Opencode Costs Viewer.app",
+        "ACM Agent Cost Monitor.app",
         "Contents",
         "MacOS",
-        "Opencode Costs Viewer",
+        "ACM Agent Cost Monitor",
       );
       if (existsSync(candidate)) return candidate;
     }

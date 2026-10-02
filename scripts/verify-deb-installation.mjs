@@ -16,7 +16,7 @@ try {
   run("sudo", ["apt-get", "install", "--yes", debPath]);
   installed = true;
   const packageFiles = capture("dpkg-query", ["-L", packageName]).split(/\r?\n/).filter(Boolean);
-  const executableCandidates = packageFiles.filter(file => path.basename(file) === "opencode-costs-viewer");
+  const executableCandidates = packageFiles.filter(file => path.basename(file) === "acm-agent-cost-monitor");
   const executablePath = await findExecutable(executableCandidates);
   const desktopLaunchers = packageFiles.filter(file => file.endsWith(".desktop"));
   if (desktopLaunchers.length !== 1) {
@@ -59,7 +59,7 @@ async function findExecutable(candidates) {
       continue;
     }
   }
-  throw new Error("Installed opencode-costs-viewer executable was not found in the Debian package file list.");
+  throw new Error("Installed acm-agent-cost-monitor executable was not found in the Debian package file list.");
 }
 
 async function runPackagedE2e(executablePath) {

@@ -76,7 +76,7 @@ process.once("SIGINT", () => stopFromSignal("SIGINT"));
 process.once("SIGTERM", () => stopFromSignal("SIGTERM"));
 
 try {
-isolatedDirectory = await mkdtemp(path.join(os.tmpdir(), "opencode-costs-viewer-e2e-"));
+  isolatedDirectory = await mkdtemp(path.join(os.tmpdir(), "acm-agent-cost-monitor-e2e-"));
 const isolatedSqlPath = path.join(isolatedDirectory, "fixture.sql");
 const alternateSqlPath = path.join(isolatedDirectory, "alternate-fixture.sql");
 const primaryDatabasePath = path.join(isolatedDirectory, "primary.sqlite");

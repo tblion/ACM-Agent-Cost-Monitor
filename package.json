@@ -1,6 +1,6 @@
 {
-  "name": "opencode-costs-viewer",
-  "description": "Desktop viewer for OpenCode session costs and token usage.",
+  "name": "acm-agent-cost-monitor",
+  "description": "Desktop monitor for costs and token usage across AI coding agents.",
   "author": "Thomas Blion",
   "private": true,
   "version": "1.0.0",

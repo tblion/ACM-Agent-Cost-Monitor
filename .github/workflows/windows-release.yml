@@ -70,7 +70,7 @@ jobs:
       - name: Upload workflow installers
         uses: actions/upload-artifact@v6
         with:
-          name: opencode-costs-viewer-windows-x64
+          name: acm-agent-cost-monitor-windows-x64
           path: |
             ${{ steps.installers.outputs.exe }}
             ${{ steps.installers.outputs.msi }}
@@ -89,11 +89,11 @@ jobs:
         run: |
           $assets = @(gh release view "$env:RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')
           $version = $env:RELEASE_TAG.Substring(1)
-          $windowsPrefix = [regex]::Escape("Opencode Costs Viewer-$version-")
+          $windowsPrefix = [regex]::Escape("ACM Agent Cost Monitor-$version-")
           $exe = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.exe$" })
           $msi = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.msi$" })
           $dmgs = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.dmg$" })
-          $deb = @($assets | Where-Object { $_ -match "^opencode-costs-viewer[_-]$([regex]::Escape($version)).*\.deb$" })
+          $deb = @($assets | Where-Object { $_ -match "^acm-agent-cost-monitor[_-]$([regex]::Escape($version)).*\.deb$" })
           if ($exe.Count -ne 1) { throw "Release must contain exactly one NSIS .exe for version $version." }
           if ($msi.Count -ne 1) { throw "Release must contain exactly one MSI for version $version." }
           if ($dmgs.Count -ne 2) { throw "Release must contain exactly two DMGs for version $version." }

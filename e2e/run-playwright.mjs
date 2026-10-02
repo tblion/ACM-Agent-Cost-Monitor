@@ -26,7 +26,7 @@ function reserveFreePort() {
 
 const port = Number(process.env.E2E_PORT ?? await reserveFreePort());
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`Invalid E2E_PORT: ${port}`);
-const childPidFile = path.join(os.tmpdir(), `opencode-costs-viewer-e2e-${process.pid}.pid`);
+const childPidFile = path.join(os.tmpdir(), `acm-agent-cost-monitor-e2e-${process.pid}.pid`);
 const electronConfig = process.env.E2E_ELECTRON === "true"
   ? ["--config=playwright.electron.config.ts"]
   : [];

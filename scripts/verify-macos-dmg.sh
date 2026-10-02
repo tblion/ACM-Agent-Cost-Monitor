@@ -1,6 +1,7 @@
 set -euo pipefail
 
-dmgs=(release/*.dmg)
+shopt -s nullglob
+dmgs=(release/ACM\ Agent\ Cost\ Monitor-*.dmg)
 if [ "${#dmgs[@]}" -ne 1 ]; then
   printf 'Expected one DMG in release/, found %s.\n' "${#dmgs[@]}" >&2
   exit 1
@@ -23,10 +24,10 @@ if [ "$applications_alias" != "/Applications" ]; then
   exit 1
 fi
 
-source_app="$mount_point/Opencode Costs Viewer.app"
-installed_app="$install_root/Opencode Costs Viewer.app"
+source_app="$mount_point/ACM Agent Cost Monitor.app"
+installed_app="$install_root/ACM Agent Cost Monitor.app"
 run_packaged_e2e() {
-  ELECTRON_EXECUTABLE_PATH="$installed_app/Contents/MacOS/Opencode Costs Viewer" \
+  ELECTRON_EXECUTABLE_PATH="$installed_app/Contents/MacOS/ACM Agent Cost Monitor" \
     E2E_ELECTRON=true node e2e/run-playwright.mjs
 }
 
