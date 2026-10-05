@@ -1,6 +1,6 @@
 // Tests pricing catalog generation without modifying embedded release data.
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,17 +14,19 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const generator = join(root, "scripts", "generate-pricing.mjs");
 const release = join(root, "scripts", "release-pricing.mjs");
 
-test("builds a PowerShell atomic replacement invocation without interpolating paths", () => {
-  const source = "C:\\Runner Temp\\catalog.tmp";
-  const destination = "C:\\Runner Temp\\pricing.json";
-  const invocation = pricingGenerator.windowsReplacementInvocation(source, destination, { PATH: "C:\\Windows" });
-
-  assert.equal(invocation.command, "powershell.exe");
-  assert.deepEqual(invocation.args.slice(0, 3), ["-NoProfile", "-NonInteractive", "-Command"]);
-  assert.match(invocation.args[3], /\[System\.IO\.File\]::Replace/);
-  assert.match(invocation.args[3], /\[System\.IO\.File\]::Move/);
-  assert.equal(invocation.environment.ACM_CATALOG_SOURCE, source);
-  assert.equal(invocation.environment.ACM_CATALOG_DESTINATION, destination);
+test("atomically replaces an existing catalog on Windows", async () => {
+  await withTempDirectory(async (directory) => {
+    const destination = join(directory, "pricing.json");
+    await writeFile(destination, "old catalog");
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { ...originalPlatform, value: "win32" });
+    try {
+      await writeCatalogAtomically({ version: 1 }, destination);
+    } finally {
+      Object.defineProperty(process, "platform", originalPlatform);
+    }
+    assert.deepEqual(JSON.parse(await readFile(destination, "utf8")), { version: 1 });
+  });
 });
 
 test("removes empty signing variables before launching electron-builder", async () => {
@@ -61,6 +63,22 @@ test("publishes stable tags as stable releases and prerelease tags as prerelease
   const prerelease = publicationModule.createReleaseArguments("v1.1.0-beta.1", ["app.deb"], "owner/repo");
   assert.equal(stable.includes("--prerelease"), false);
   assert.equal(prerelease.includes("--prerelease"), true);
+});
+
+test("skips executable-named documentation directories when resolving packaged binaries", async () => {
+  const executableModule = await import("./find-executable.mjs").catch(() => ({}));
+  assert.equal(typeof executableModule.findExecutable, "function");
+
+  await withTempDirectory(async (directory) => {
+    const documentationDirectory = join(directory, "acm-agent-cost-monitor");
+    const executable = join(directory, "bin", "acm-agent-cost-monitor");
+    await mkdir(documentationDirectory);
+    await mkdir(dirname(executable));
+    await writeFile(executable, "#!/bin/sh\nexit 0\n");
+    await chmod(executable, 0o755);
+
+    assert.equal(await executableModule.findExecutable([documentationDirectory, executable]), executable);
+  });
 });
 
 async function withTempDirectory(callback) {

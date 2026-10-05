@@ -1,8 +1,10 @@
+// Installs and smoke-tests the generated Debian package in an isolated environment.
 import { spawnSync } from "node:child_process";
-import { access, readdir } from "node:fs/promises";
-import { constants, existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findExecutable } from "./find-executable.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const releaseDirectory = path.join(root, "release");
@@ -48,18 +50,6 @@ function capture(command, args) {
   if (result.error) throw new Error(`${command} failed to start: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`${command} exited with code ${result.status}: ${result.stderr}`);
   return result.stdout;
-}
-
-async function findExecutable(candidates) {
-  for (const candidate of candidates) {
-    try {
-      await access(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  throw new Error("Installed acm-agent-cost-monitor executable was not found in the Debian package file list.");
 }
 
 async function runPackagedE2e(executablePath) {
