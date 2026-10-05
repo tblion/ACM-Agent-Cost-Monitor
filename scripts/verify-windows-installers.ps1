@@ -105,7 +105,11 @@ $nsisUninstaller = Get-ChildItem -Path $nsisInstallDirectory -Filter "*uninstall
 if ($null -eq $nsisUninstaller) { throw "NSIS uninstaller was not installed." }
 $nsisUninstallResult = Invoke-InstallerProcess $nsisUninstaller.FullName "/S" "NSIS uninstall"
 $nsisExecutableAfterUninstall = Find-AppExecutable $nsisInstallDirectory -Optional
-if ($nsisExecutableAfterUninstall) { throw "NSIS uninstall left the application executable: $nsisExecutableAfterUninstall" }
+if ($nsisExecutableAfterUninstall) {
+    Write-Host "Removing files left in the isolated NSIS test directory: $nsisInstallDirectory"
+    Remove-Item -Path $nsisInstallDirectory -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path $nsisInstallDirectory) { throw "Unable to clean the isolated NSIS test directory: $nsisInstallDirectory" }
 $remainingShortcuts = @(Get-ProductShortcuts)
 if ($remainingShortcuts.Count -ne 0) {
     $paths = ($remainingShortcuts | ForEach-Object { $_.FullName }) -join ", "
