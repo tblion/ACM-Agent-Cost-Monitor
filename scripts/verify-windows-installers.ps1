@@ -1,11 +1,5 @@
 $ErrorActionPreference = "Stop"
 
-function Assert-InstallerExit($process, [string]$operation) {
-    if ($process.ExitCode -notin @(0, 3010)) {
-        throw "$operation failed with exit code $($process.ExitCode)."
-    }
-}
-
 function Find-AppExecutable([string]$installDirectory, [switch]$Optional) {
     if (-not (Test-Path $installDirectory)) {
         if ($Optional) { return $null }
@@ -18,23 +12,21 @@ function Find-AppExecutable([string]$installDirectory, [switch]$Optional) {
     return $application.FullName
 }
 
-function Resolve-MsiInstallDirectory([string]$requestedDirectory) {
-    if (Test-Path $requestedDirectory) { return $requestedDirectory }
-
-    $uninstallRoots = @(
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-    )
-    $application = Get-ItemProperty -Path $uninstallRoots -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -eq "ACM Agent Cost Monitor" } |
-        Select-Object -First 1
-    if ($application -and $application.InstallLocation -and (Test-Path $application.InstallLocation)) {
-        return $application.InstallLocation
+function Invoke-InstallerProcess([string]$filePath, [string]$arguments, [string]$operation, [string]$logPath = $null) {
+    Write-Host "${operation}: $filePath $arguments"
+    $process = Start-Process -FilePath $filePath -ArgumentList $arguments -PassThru
+    if (-not $process.WaitForExit(600000)) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        throw "$operation timed out after 10 minutes."
     }
-
-    $defaultDirectory = Join-Path $env:ProgramFiles "ACM Agent Cost Monitor"
-    if (Test-Path $defaultDirectory) { return $defaultDirectory }
-    throw "MSI application install directory not found; requested $requestedDirectory."
+    $process.Refresh()
+    if ($process.ExitCode -notin @(0, 3010)) {
+        $details = if ($logPath -and (Test-Path $logPath)) {
+            (Get-Content -Path $logPath -Tail 60) -join [Environment]::NewLine
+        } else { "No installer log available." }
+        throw "$operation failed with exit code $($process.ExitCode).`n$details"
+    }
+    return $process
 }
 
 function Get-ProductShortcuts {
@@ -66,7 +58,8 @@ function Invoke-PackagedE2e([string]$executablePath) {
     $previousPath = $env:ELECTRON_EXECUTABLE_PATH
     try {
         $env:ELECTRON_EXECUTABLE_PATH = $executablePath
-        npm run test:e2e:electron
+        $env:E2E_ELECTRON = "true"
+        node node_modules/@playwright/test/cli.js test --config=playwright.electron.config.ts
         if ($LASTEXITCODE -ne 0) { throw "Packaged Electron E2E failed for $executablePath." }
     }
     finally {
@@ -88,14 +81,13 @@ $settingsMarker = Join-Path $settingsDirectory "installer-upgrade-marker.txt"
 Set-Content -Path $settingsMarker -Value "preserve across install and uninstall" -NoNewline
 Remove-Item -Path $nsisInstallDirectory, $msiInstallDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
-$nsisInstallResult = Start-Process -FilePath $nsisInstaller.FullName -ArgumentList @("/S", "/D=$nsisInstallDirectory") -Wait -PassThru
-Assert-InstallerExit $nsisInstallResult "NSIS install"
+$nsisInstallArguments = "/S /D=`"$nsisInstallDirectory`""
+$nsisInstallResult = Invoke-InstallerProcess $nsisInstaller.FullName $nsisInstallArguments "NSIS install"
 $nsisExecutable = Find-AppExecutable $nsisInstallDirectory
 Invoke-PackagedE2e $nsisExecutable
 Assert-ShortcutState 1
 
-$nsisRepairResult = Start-Process -FilePath $nsisInstaller.FullName -ArgumentList @("/S", "/D=$nsisInstallDirectory") -Wait -PassThru
-Assert-InstallerExit $nsisRepairResult "NSIS reinstall"
+$nsisRepairResult = Invoke-InstallerProcess $nsisInstaller.FullName $nsisInstallArguments "NSIS reinstall"
 $nsisExecutable = Find-AppExecutable $nsisInstallDirectory
 Invoke-PackagedE2e $nsisExecutable
 Assert-ShortcutState 1
@@ -103,31 +95,29 @@ if (-not (Test-Path $settingsMarker)) { throw "NSIS reinstall removed applicatio
 
 $nsisUninstaller = Get-ChildItem -Path $nsisInstallDirectory -Filter "*uninstall*.exe" -File -Recurse | Select-Object -First 1
 if ($null -eq $nsisUninstaller) { throw "NSIS uninstaller was not installed." }
-$nsisUninstallResult = Start-Process -FilePath $nsisUninstaller.FullName -ArgumentList "/S" -Wait -PassThru
-Assert-InstallerExit $nsisUninstallResult "NSIS uninstall"
+$nsisUninstallResult = Invoke-InstallerProcess $nsisUninstaller.FullName "/S" "NSIS uninstall"
 if ((Get-ProductShortcuts).Count -ne 0) { throw "NSIS uninstall left a Start Menu shortcut." }
 if (Find-AppExecutable $nsisInstallDirectory -Optional) { throw "NSIS uninstall left the application executable." }
 if (-not (Test-Path $settingsMarker)) { throw "NSIS uninstall removed application settings." }
 
-$installArguments = "/i `"$($msiInstaller.FullName)`" /qn /norestart ALLUSERS=1 INSTALLDIR=`"$msiInstallDirectory`""
-$msiInstallResult = Start-Process -FilePath "msiexec.exe" -ArgumentList $installArguments -Wait -PassThru
-Assert-InstallerExit $msiInstallResult "MSI install"
-$msiInstallDirectory = Resolve-MsiInstallDirectory $msiInstallDirectory
+$msiInstallLog = Join-Path $env:RUNNER_TEMP "acm-agent-cost-monitor-msi-install.log"
+$installArguments = "/i `"$($msiInstaller.FullName)`" /qn /norestart ALLUSERS=1 APPLICATIONFOLDER=`"$msiInstallDirectory`" /L*V `"$msiInstallLog`""
+$msiInstallResult = Invoke-InstallerProcess "msiexec.exe" $installArguments "MSI install" $msiInstallLog
 $msiExecutable = Find-AppExecutable $msiInstallDirectory
 Invoke-PackagedE2e $msiExecutable
 Assert-ShortcutState 1
 
-$repairArguments = "/fa `"$($msiInstaller.FullName)`" /qn /norestart REINSTALL=ALL REINSTALLMODE=vomus"
-$msiRepairResult = Start-Process -FilePath "msiexec.exe" -ArgumentList $repairArguments -Wait -PassThru
-Assert-InstallerExit $msiRepairResult "MSI repair"
+$repairLog = Join-Path $env:RUNNER_TEMP "acm-agent-cost-monitor-msi-repair.log"
+$repairArguments = "/fa `"$($msiInstaller.FullName)`" /qn /norestart REINSTALL=ALL REINSTALLMODE=vomus /L*V `"$repairLog`""
+$msiRepairResult = Invoke-InstallerProcess "msiexec.exe" $repairArguments "MSI repair" $repairLog
 $msiExecutable = Find-AppExecutable $msiInstallDirectory
 Invoke-PackagedE2e $msiExecutable
 Assert-ShortcutState 1
 if (-not (Test-Path $settingsMarker)) { throw "MSI repair removed application settings." }
 
-$uninstallArguments = "/x `"$($msiInstaller.FullName)`" /qn /norestart"
-$msiUninstallResult = Start-Process -FilePath "msiexec.exe" -ArgumentList $uninstallArguments -Wait -PassThru
-Assert-InstallerExit $msiUninstallResult "MSI uninstall"
+$uninstallLog = Join-Path $env:RUNNER_TEMP "acm-agent-cost-monitor-msi-uninstall.log"
+$uninstallArguments = "/x `"$($msiInstaller.FullName)`" /qn /norestart /L*V `"$uninstallLog`""
+$msiUninstallResult = Invoke-InstallerProcess "msiexec.exe" $uninstallArguments "MSI uninstall" $uninstallLog
 if ((Get-ProductShortcuts).Count -ne 0) { throw "MSI uninstall left a Start Menu shortcut." }
 if (Find-AppExecutable $msiInstallDirectory -Optional) { throw "MSI uninstall left the application executable." }
 if (-not (Test-Path $settingsMarker)) { throw "MSI uninstall removed application settings." }
