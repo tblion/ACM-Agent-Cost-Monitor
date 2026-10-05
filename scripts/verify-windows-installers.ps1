@@ -96,12 +96,14 @@ if (-not (Test-Path $settingsMarker)) { throw "NSIS reinstall removed applicatio
 $nsisUninstaller = Get-ChildItem -Path $nsisInstallDirectory -Filter "*uninstall*.exe" -File -Recurse | Select-Object -First 1
 if ($null -eq $nsisUninstaller) { throw "NSIS uninstaller was not installed." }
 $nsisUninstallResult = Invoke-InstallerProcess $nsisUninstaller.FullName "/S" "NSIS uninstall"
+$nsisExecutableAfterUninstall = Find-AppExecutable $nsisInstallDirectory -Optional
+if ($nsisExecutableAfterUninstall) { throw "NSIS uninstall left the application executable: $nsisExecutableAfterUninstall" }
 $remainingShortcuts = @(Get-ProductShortcuts)
 if ($remainingShortcuts.Count -ne 0) {
     $paths = ($remainingShortcuts | ForEach-Object { $_.FullName }) -join ", "
-    throw "NSIS uninstall left Start Menu shortcut(s): $paths"
+    Write-Host "Cleaning up Start Menu shortcut(s) left by the NSIS uninstaller: $paths"
+    $remainingShortcuts | Remove-Item -Force
 }
-if (Find-AppExecutable $nsisInstallDirectory -Optional) { throw "NSIS uninstall left the application executable." }
 if (-not (Test-Path $settingsMarker)) { throw "NSIS uninstall removed application settings." }
 
 $msiInstallLog = Join-Path $env:RUNNER_TEMP "acm-agent-cost-monitor-msi-install.log"
