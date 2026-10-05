@@ -55,6 +55,15 @@ test("removes empty signing variables before launching electron-builder", async 
   assert.equal(environment.CSC_IDENTITY_AUTO_DISCOVERY, "false");
 });
 
+test("preserves the Windows executable search path when preparing the build environment", async () => {
+  const environmentModule = await import("./electron-builder-environment.mjs");
+  const environment = environmentModule.prepareElectronBuilderEnvironment({
+    Path: "C:\\Windows\\System32;C:\\tools",
+  }, "win32");
+
+  assert.equal(environment.PATH, "C:\\Windows\\System32;C:\\tools");
+});
+
 test("publishes stable tags as stable releases and prerelease tags as prereleases", async () => {
   const publicationModule = await import("./release-publication.mjs").catch(() => ({}));
   assert.equal(typeof publicationModule.createReleaseArguments, "function");

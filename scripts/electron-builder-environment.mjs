@@ -10,7 +10,7 @@ const signingVariables = [
   "APPLE_TEAM_ID",
 ];
 
-export function prepareElectronBuilderEnvironment(environment) {
+export function prepareElectronBuilderEnvironment(environment, platform = process.platform) {
   const prepared = { ...environment };
   for (const variable of signingVariables) {
     if (!prepared[variable]) delete prepared[variable];
@@ -19,6 +19,9 @@ export function prepareElectronBuilderEnvironment(environment) {
   const hasSigningCredentials = Boolean(prepared.CSC_LINK || prepared.CSC_NAME || prepared.WIN_CSC_LINK);
   if (!hasSigningCredentials && !prepared.CSC_IDENTITY_AUTO_DISCOVERY) {
     prepared.CSC_IDENTITY_AUTO_DISCOVERY = "false";
+  }
+  if (platform === "win32" && !prepared.PATH && prepared.Path) {
+    prepared.PATH = prepared.Path;
   }
   return prepared;
 }
