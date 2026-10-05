@@ -29,6 +29,53 @@ function Invoke-InstallerProcess([string]$filePath, [string]$arguments, [string]
     return $process
 }
 
+function Stop-PackagedApplicationProcesses([string]$applicationRoot) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        $applicationProcesses = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.ExecutablePath -and $_.ExecutablePath.StartsWith($applicationRoot, [StringComparison]::OrdinalIgnoreCase)
+            })
+        if ($applicationProcesses.Count -eq 0) { return }
+
+        foreach ($applicationProcess in $applicationProcesses) {
+            taskkill.exe /PID $applicationProcess.ProcessId /T /F 2>$null | Out-Null
+        }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    $applicationProcesses = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.ExecutablePath -and $_.ExecutablePath.StartsWith($applicationRoot, [StringComparison]::OrdinalIgnoreCase)
+        })
+    if ($applicationProcesses.Count -eq 0) { return }
+
+    $remainingIds = ($applicationProcesses | ForEach-Object { $_.ProcessId }) -join ", "
+    throw "Packaged application processes did not exit after cleanup: $remainingIds"
+}
+
+function Remove-TestInstallDirectory([string]$installDirectory) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    do {
+        if (-not (Test-Path -LiteralPath $installDirectory)) { return }
+
+        try {
+            Remove-Item -LiteralPath $installDirectory -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Host "Waiting to remove the isolated installer test directory: $($_.Exception.Message)"
+        }
+
+        if (Test-Path -LiteralPath $installDirectory) { Start-Sleep -Milliseconds 500 }
+    } while ((Test-Path -LiteralPath $installDirectory) -and [DateTime]::UtcNow -lt $deadline)
+
+    if (Test-Path -LiteralPath $installDirectory) {
+        $remainingPaths = (Get-ChildItem -LiteralPath $installDirectory -Force -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty FullName) -join ", "
+        throw "Unable to clean the isolated installer test directory: $installDirectory. Remaining paths: $remainingPaths"
+    }
+}
+
 function Get-ProductShortcuts {
     $startMenus = @(
         (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"),
@@ -64,14 +111,12 @@ function Invoke-PackagedE2e([string]$executablePath) {
         if ($LASTEXITCODE -ne 0) { throw "Packaged Electron E2E failed for $executablePath." }
     }
     finally {
-        $applicationProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.ExecutablePath -and $_.ExecutablePath.StartsWith($applicationRoot, [StringComparison]::OrdinalIgnoreCase)
-            }
-        foreach ($applicationProcess in $applicationProcesses) {
-            taskkill.exe /PID $applicationProcess.ProcessId /T /F 2>$null | Out-Null
+        try {
+            Stop-PackagedApplicationProcesses $applicationRoot
         }
-        $env:ELECTRON_EXECUTABLE_PATH = $previousPath
+        finally {
+            $env:ELECTRON_EXECUTABLE_PATH = $previousPath
+        }
     }
 }
 
@@ -107,9 +152,9 @@ $nsisUninstallResult = Invoke-InstallerProcess $nsisUninstaller.FullName "/S" "N
 $nsisExecutableAfterUninstall = Find-AppExecutable $nsisInstallDirectory -Optional
 if ($nsisExecutableAfterUninstall) {
     Write-Host "Removing files left in the isolated NSIS test directory: $nsisInstallDirectory"
-    Remove-Item -Path $nsisInstallDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-TestInstallDirectory $nsisInstallDirectory
 }
-if (Test-Path $nsisInstallDirectory) { throw "Unable to clean the isolated NSIS test directory: $nsisInstallDirectory" }
+if (Test-Path $nsisInstallDirectory) { Remove-TestInstallDirectory $nsisInstallDirectory }
 $remainingShortcuts = @(Get-ProductShortcuts)
 if ($remainingShortcuts.Count -ne 0) {
     $paths = ($remainingShortcuts | ForEach-Object { $_.FullName }) -join ", "
