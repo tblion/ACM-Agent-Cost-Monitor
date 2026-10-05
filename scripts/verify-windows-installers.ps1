@@ -56,6 +56,7 @@ function Assert-ShortcutState([int]$expectedStartMenuCount) {
 
 function Invoke-PackagedE2e([string]$executablePath) {
     $previousPath = $env:ELECTRON_EXECUTABLE_PATH
+    $applicationRoot = Split-Path $executablePath -Parent
     try {
         $env:ELECTRON_EXECUTABLE_PATH = $executablePath
         $env:E2E_ELECTRON = "true"
@@ -63,6 +64,13 @@ function Invoke-PackagedE2e([string]$executablePath) {
         if ($LASTEXITCODE -ne 0) { throw "Packaged Electron E2E failed for $executablePath." }
     }
     finally {
+        $applicationProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.ExecutablePath -and $_.ExecutablePath.StartsWith($applicationRoot, [StringComparison]::OrdinalIgnoreCase)
+            }
+        foreach ($applicationProcess in $applicationProcesses) {
+            taskkill.exe /PID $applicationProcess.ProcessId /T /F 2>$null | Out-Null
+        }
         $env:ELECTRON_EXECUTABLE_PATH = $previousPath
     }
 }
