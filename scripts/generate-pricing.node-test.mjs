@@ -1,3 +1,4 @@
+// Tests pricing catalog generation without modifying embedded release data.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -5,12 +6,62 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
+import * as pricingGenerator from "./generate-pricing.mjs";
 import { writeCatalogAtomically } from "./generate-pricing.mjs";
 import { runPricingValidator } from "./release-pricing.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const generator = join(root, "scripts", "generate-pricing.mjs");
 const release = join(root, "scripts", "release-pricing.mjs");
+
+test("builds a PowerShell atomic replacement invocation without interpolating paths", () => {
+  const source = "C:\\Runner Temp\\catalog.tmp";
+  const destination = "C:\\Runner Temp\\pricing.json";
+  const invocation = pricingGenerator.windowsReplacementInvocation(source, destination, { PATH: "C:\\Windows" });
+
+  assert.equal(invocation.command, "powershell.exe");
+  assert.deepEqual(invocation.args.slice(0, 3), ["-NoProfile", "-NonInteractive", "-Command"]);
+  assert.match(invocation.args[3], /\[System\.IO\.File\]::Replace/);
+  assert.match(invocation.args[3], /\[System\.IO\.File\]::Move/);
+  assert.equal(invocation.environment.ACM_CATALOG_SOURCE, source);
+  assert.equal(invocation.environment.ACM_CATALOG_DESTINATION, destination);
+});
+
+test("removes empty signing variables before launching electron-builder", async () => {
+  const environmentModule = await import("./electron-builder-environment.mjs").catch(() => ({}));
+  assert.equal(typeof environmentModule.prepareElectronBuilderEnvironment, "function");
+
+  const environment = environmentModule.prepareElectronBuilderEnvironment({
+    PATH: "/usr/bin",
+    CSC_LINK: "",
+    CSC_KEY_PASSWORD: "",
+    CSC_NAME: "",
+    WIN_CSC_LINK: "",
+    APPLE_ID: "",
+    APPLE_APP_SPECIFIC_PASSWORD: "",
+    APPLE_TEAM_ID: "",
+  });
+
+  assert.equal(environment.PATH, "/usr/bin");
+  assert.equal(environment.CSC_LINK, undefined);
+  assert.equal(environment.CSC_KEY_PASSWORD, undefined);
+  assert.equal(environment.CSC_NAME, undefined);
+  assert.equal(environment.WIN_CSC_LINK, undefined);
+  assert.equal(environment.APPLE_ID, undefined);
+  assert.equal(environment.APPLE_APP_SPECIFIC_PASSWORD, undefined);
+  assert.equal(environment.APPLE_TEAM_ID, undefined);
+  assert.equal(environment.CSC_IDENTITY_AUTO_DISCOVERY, "false");
+});
+
+test("publishes stable tags as stable releases and prerelease tags as prereleases", async () => {
+  const publicationModule = await import("./release-publication.mjs").catch(() => ({}));
+  assert.equal(typeof publicationModule.createReleaseArguments, "function");
+
+  const stable = publicationModule.createReleaseArguments("v1.0.0", ["app.deb"], "owner/repo");
+  const prerelease = publicationModule.createReleaseArguments("v1.1.0-beta.1", ["app.deb"], "owner/repo");
+  assert.equal(stable.includes("--prerelease"), false);
+  assert.equal(prerelease.includes("--prerelease"), true);
+});
 
 async function withTempDirectory(callback) {
   const directory = await mkdtemp(join(tmpdir(), "opencode-pricing-"));

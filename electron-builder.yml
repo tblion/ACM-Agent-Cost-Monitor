@@ -1,3 +1,4 @@
+# Defines Electron packaging metadata and platform-specific installer settings.
 appId: com.fcpb6403.acm-agent-cost-monitor
 productName: ACM Agent Cost Monitor
 asar: true
@@ -53,6 +54,7 @@ linux:
   icon: assets/icons/128x128.png
   executableName: acm-agent-cost-monitor
   category: Utility
+  maintainer: "Thomas Blion <tblion@users.noreply.github.com>"
   target:
     - deb
 deb:

@@ -1,7 +1,9 @@
+// Builds Electron release bundles and validates their expected artifacts.
 import { spawnSync } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createReleaseArguments } from "./release-publication.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const artifactRoot = path.resolve(process.argv[2] ?? path.join(root, "release-assets"));
@@ -49,7 +51,7 @@ if (releaseView.status === 0 && process.env.ALLOW_RELEASE_REPLACE !== "true") {
 
 const publish = releaseView.status === 0
   ? ["release", "upload", tag, ...installers, "--repo", repository, "--clobber"]
-  : ["release", "create", tag, ...installers, "--repo", repository, "--title", tag, "--generate-notes", "--prerelease"];
+  : createReleaseArguments(tag, installers, repository);
 const result = spawnSync("gh", publish, { cwd: root, stdio: "inherit" });
 if (result.error) throw new Error(`Unable to publish release assets: ${result.error.message}`);
 if (result.status !== 0) throw new Error(`gh release command exited with code ${result.status}.`);

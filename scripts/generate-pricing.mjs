@@ -1,3 +1,4 @@
+// Generates a normalized pricing catalog from supported source data.
 import { randomUUID } from "node:crypto";
 import { open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -6,6 +7,27 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultSource = join(root, "src-dotnet", "Resources", "pricing-source.json");
 const defaultOutput = join(root, "src-dotnet", "Resources", "pricing.json");
+
+export function windowsReplacementInvocation(source, destination, environment = process.env) {
+  return {
+    command: "powershell.exe",
+    args: [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "$ErrorActionPreference = 'Stop'; try { "
+        + "$source = $env:ACM_CATALOG_SOURCE; $destination = $env:ACM_CATALOG_DESTINATION; "
+        + "if ([System.IO.File]::Exists($destination)) { [System.IO.File]::Replace($source, $destination, $null) } "
+        + "else { [System.IO.File]::Move($source, $destination) }; exit 0 "
+        + "} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }",
+    ],
+    environment: {
+      ...environment,
+      ACM_CATALOG_SOURCE: source,
+      ACM_CATALOG_DESTINATION: destination,
+    },
+  };
+}
 
 export function parseArguments(argumentsList) {
   const argumentsMap = new Map();
@@ -148,9 +170,12 @@ export async function writeCatalogAtomically(catalog, output) {
       await handle.close();
     }
     if (process.platform === "win32") {
-      // `move` utilise le remplacement du volume Windows, contrairement à fs.rename sur une destination existante.
       const { spawnSync } = await import("node:child_process");
-      const result = spawnSync("cmd.exe", ["/d", "/s", "/c", `move /Y "${temporary}" "${destination}"`], { encoding: "utf8" });
+      const invocation = windowsReplacementInvocation(temporary, destination);
+      const result = spawnSync(invocation.command, invocation.args, {
+        encoding: "utf8",
+        env: invocation.environment,
+      });
       if (result.error) {
         throw new Error(`cannot launch Windows atomic replacement: ${result.error.message}`);
       }
