@@ -96,7 +96,11 @@ if (-not (Test-Path $settingsMarker)) { throw "NSIS reinstall removed applicatio
 $nsisUninstaller = Get-ChildItem -Path $nsisInstallDirectory -Filter "*uninstall*.exe" -File -Recurse | Select-Object -First 1
 if ($null -eq $nsisUninstaller) { throw "NSIS uninstaller was not installed." }
 $nsisUninstallResult = Invoke-InstallerProcess $nsisUninstaller.FullName "/S" "NSIS uninstall"
-if ((Get-ProductShortcuts).Count -ne 0) { throw "NSIS uninstall left a Start Menu shortcut." }
+$remainingShortcuts = @(Get-ProductShortcuts)
+if ($remainingShortcuts.Count -ne 0) {
+    $paths = ($remainingShortcuts | ForEach-Object { $_.FullName }) -join ", "
+    throw "NSIS uninstall left Start Menu shortcut(s): $paths"
+}
 if (Find-AppExecutable $nsisInstallDirectory -Optional) { throw "NSIS uninstall left the application executable." }
 if (-not (Test-Path $settingsMarker)) { throw "NSIS uninstall removed application settings." }
 
