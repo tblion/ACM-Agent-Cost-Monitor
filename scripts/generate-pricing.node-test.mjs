@@ -64,6 +64,16 @@ test("preserves the Windows executable search path when preparing the build envi
   assert.equal(environment.PATH, "C:\\Windows\\System32;C:\\tools");
 });
 
+test("launches electron-builder through Node instead of a platform command shim", async () => {
+  const environmentModule = await import("./electron-builder-environment.mjs");
+  assert.equal(typeof environmentModule.electronBuilderInvocation, "function");
+
+  const invocation = environmentModule.electronBuilderInvocation("/workspace/app", ["--win", "--x64"]);
+  assert.equal(invocation.command, process.execPath);
+  assert.equal(invocation.args[0], join("/workspace/app", "node_modules", "electron-builder", "cli.js"));
+  assert.deepEqual(invocation.args.slice(1), ["--win", "--x64"]);
+});
+
 test("publishes stable tags as stable releases and prerelease tags as prereleases", async () => {
   const publicationModule = await import("./release-publication.mjs").catch(() => ({}));
   assert.equal(typeof publicationModule.createReleaseArguments, "function");

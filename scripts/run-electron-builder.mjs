@@ -2,12 +2,13 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { prepareElectronBuilderEnvironment } from "./electron-builder-environment.mjs";
+import { electronBuilderInvocation, prepareElectronBuilderEnvironment } from "./electron-builder-environment.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const environment = prepareElectronBuilderEnvironment(process.env);
 
-const result = spawnSync("electron-builder", process.argv.slice(2), {
+const invocation = electronBuilderInvocation(root, process.argv.slice(2));
+const result = spawnSync(invocation.command, invocation.args, {
   cwd: root,
   env: environment,
   stdio: "inherit",

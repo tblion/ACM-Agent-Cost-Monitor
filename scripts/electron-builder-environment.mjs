@@ -1,4 +1,6 @@
 // Prepares signing-related environment variables for electron-builder.
+import { join } from "node:path";
+
 const signingVariables = [
   "CSC_LINK",
   "CSC_KEY_PASSWORD",
@@ -24,4 +26,11 @@ export function prepareElectronBuilderEnvironment(environment, platform = proces
     prepared.PATH = prepared.Path;
   }
   return prepared;
+}
+
+export function electronBuilderInvocation(root, args) {
+  return {
+    command: process.execPath,
+    args: [join(root, "node_modules", "electron-builder", "cli.js"), ...args],
+  };
 }
