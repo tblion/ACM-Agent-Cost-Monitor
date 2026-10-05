@@ -81,7 +81,7 @@ $settingsMarker = Join-Path $settingsDirectory "installer-upgrade-marker.txt"
 Set-Content -Path $settingsMarker -Value "preserve across install and uninstall" -NoNewline
 Remove-Item -Path $nsisInstallDirectory, $msiInstallDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
-$nsisInstallArguments = "/S /D=`"$nsisInstallDirectory`""
+$nsisInstallArguments = "/S /D=$nsisInstallDirectory"
 $nsisInstallResult = Invoke-InstallerProcess $nsisInstaller.FullName $nsisInstallArguments "NSIS install"
 $nsisExecutable = Find-AppExecutable $nsisInstallDirectory
 Invoke-PackagedE2e $nsisExecutable
