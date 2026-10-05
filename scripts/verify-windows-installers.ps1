@@ -18,6 +18,25 @@ function Find-AppExecutable([string]$installDirectory, [switch]$Optional) {
     return $application.FullName
 }
 
+function Resolve-MsiInstallDirectory([string]$requestedDirectory) {
+    if (Test-Path $requestedDirectory) { return $requestedDirectory }
+
+    $uninstallRoots = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    $application = Get-ItemProperty -Path $uninstallRoots -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -eq "ACM Agent Cost Monitor" } |
+        Select-Object -First 1
+    if ($application -and $application.InstallLocation -and (Test-Path $application.InstallLocation)) {
+        return $application.InstallLocation
+    }
+
+    $defaultDirectory = Join-Path $env:ProgramFiles "ACM Agent Cost Monitor"
+    if (Test-Path $defaultDirectory) { return $defaultDirectory }
+    throw "MSI application install directory not found; requested $requestedDirectory."
+}
+
 function Get-ProductShortcuts {
     $startMenus = @(
         (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"),
@@ -93,6 +112,7 @@ if (-not (Test-Path $settingsMarker)) { throw "NSIS uninstall removed applicatio
 $installArguments = "/i `"$($msiInstaller.FullName)`" /qn /norestart ALLUSERS=1 INSTALLDIR=`"$msiInstallDirectory`""
 $msiInstallResult = Start-Process -FilePath "msiexec.exe" -ArgumentList $installArguments -Wait -PassThru
 Assert-InstallerExit $msiInstallResult "MSI install"
+$msiInstallDirectory = Resolve-MsiInstallDirectory $msiInstallDirectory
 $msiExecutable = Find-AppExecutable $msiInstallDirectory
 Invoke-PackagedE2e $msiExecutable
 Assert-ShortcutState 1
