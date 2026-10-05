@@ -89,9 +89,9 @@ jobs:
         run: |
           $assets = @(gh release view "$env:RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')
           $version = $env:RELEASE_TAG.Substring(1)
-          $exeName = [regex]::Escape("ACM Agent Cost Monitor Setup $version.exe")
-          $msiName = [regex]::Escape("ACM Agent Cost Monitor $version.msi")
-          $macPrefix = [regex]::Escape("ACM Agent Cost Monitor-$version")
+          $exeName = [regex]::Escape("ACM.Agent.Cost.Monitor.Setup.$version.exe")
+          $msiName = [regex]::Escape("ACM.Agent.Cost.Monitor.$version.msi")
+          $macPrefix = [regex]::Escape("ACM.Agent.Cost.Monitor-$version")
           $exe = @($assets | Where-Object { $_ -match "^$exeName$" })
           $msi = @($assets | Where-Object { $_ -match "^$msiName$" })
           $dmgs = @($assets | Where-Object { $_ -match "^$macPrefix(?:-.*)?\.dmg$" })
