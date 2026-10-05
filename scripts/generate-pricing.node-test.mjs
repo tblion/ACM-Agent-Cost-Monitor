@@ -84,6 +84,24 @@ test("publishes stable tags as stable releases and prerelease tags as prerelease
   assert.equal(prerelease.includes("--prerelease"), true);
 });
 
+test("recognizes the default unqualified macOS Intel DMG alongside Apple Silicon", async () => {
+  const publicationModule = await import("./release-publication.mjs");
+  assert.equal(typeof publicationModule.hasValidMacDmgArchitectures, "function");
+
+  assert.equal(publicationModule.hasValidMacDmgArchitectures([
+    "ACM Agent Cost Monitor-1.0.0-arm64.dmg",
+    "ACM Agent Cost Monitor-1.0.0.dmg",
+  ]), true);
+  assert.equal(publicationModule.hasValidMacDmgArchitectures([
+    "ACM Agent Cost Monitor-1.0.0-arm64.dmg",
+    "ACM Agent Cost Monitor-1.0.0-x64.dmg",
+  ]), true);
+  assert.equal(publicationModule.hasValidMacDmgArchitectures([
+    "ACM Agent Cost Monitor-1.0.0-arm64.dmg",
+    "ACM Agent Cost Monitor-1.0.0-aarch64.dmg",
+  ]), false);
+});
+
 test("skips executable-named documentation directories when resolving packaged binaries", async () => {
   const executableModule = await import("./find-executable.mjs").catch(() => ({}));
   assert.equal(typeof executableModule.findExecutable, "function");

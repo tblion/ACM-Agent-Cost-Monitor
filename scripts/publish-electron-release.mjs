@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createReleaseArguments } from "./release-publication.mjs";
+import { createReleaseArguments, hasValidMacDmgArchitectures } from "./release-publication.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const artifactRoot = path.resolve(process.argv[2] ?? path.join(root, "release-assets"));
@@ -32,10 +32,8 @@ for (const [extension, requiredCount] of Object.entries(counts)) {
 const dmgNames = installers
   .filter(file => path.extname(file).toLowerCase() === ".dmg")
   .map(file => path.basename(file).toLowerCase());
-const hasAppleSiliconDmg = dmgNames.filter(name => name.includes("arm64") || name.includes("aarch64")).length === 1;
-const hasIntelDmg = dmgNames.filter(name => name.includes("x64") || name.includes("x86_64")).length === 1;
-if (!hasAppleSiliconDmg || !hasIntelDmg) {
-  throw new Error("Expected one Apple Silicon ARM64 DMG and one Intel x64 DMG.");
+if (!hasValidMacDmgArchitectures(dmgNames)) {
+  throw new Error("Expected one Apple Silicon ARM64 DMG and one Intel x64 DMG (which may omit its default architecture suffix).");
 }
 
 const releaseView = spawnSync("gh", ["release", "view", tag, "--repo", repository], {

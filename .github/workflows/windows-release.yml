@@ -89,14 +89,19 @@ jobs:
         run: |
           $assets = @(gh release view "$env:RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')
           $version = $env:RELEASE_TAG.Substring(1)
-          $windowsPrefix = [regex]::Escape("ACM Agent Cost Monitor-$version-")
-          $exe = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.exe$" })
-          $msi = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.msi$" })
-          $dmgs = @($assets | Where-Object { $_ -match "^$windowsPrefix.*\.dmg$" })
+          $exeName = [regex]::Escape("ACM Agent Cost Monitor Setup $version.exe")
+          $msiName = [regex]::Escape("ACM Agent Cost Monitor $version.msi")
+          $macPrefix = [regex]::Escape("ACM Agent Cost Monitor-$version")
+          $exe = @($assets | Where-Object { $_ -match "^$exeName$" })
+          $msi = @($assets | Where-Object { $_ -match "^$msiName$" })
+          $dmgs = @($assets | Where-Object { $_ -match "^$macPrefix(?:-.*)?\.dmg$" })
           $deb = @($assets | Where-Object { $_ -match "^acm-agent-cost-monitor[_-]$([regex]::Escape($version)).*\.deb$" })
           if ($exe.Count -ne 1) { throw "Release must contain exactly one NSIS .exe for version $version." }
           if ($msi.Count -ne 1) { throw "Release must contain exactly one MSI for version $version." }
           if ($dmgs.Count -ne 2) { throw "Release must contain exactly two DMGs for version $version." }
           if (@($dmgs | Where-Object { $_ -match '(arm64|aarch64)' }).Count -ne 1) { throw "Release must contain one Apple Silicon DMG for version $version." }
-          if (@($dmgs | Where-Object { $_ -match '(x64|x86_64)' }).Count -ne 1) { throw "Release must contain one Intel DMG for version $version." }
+          $intelDmgs = @($dmgs | Where-Object { $_ -match '(x64|x86_64)' })
+          $unqualifiedDmgs = @($dmgs | Where-Object { $_ -notmatch '(arm64|aarch64|x64|x86_64)' })
+          $hasIntelDmg = $intelDmgs.Count -eq 1 -or ($intelDmgs.Count -eq 0 -and $unqualifiedDmgs.Count -eq 1)
+          if (-not $hasIntelDmg) { throw "Release must contain one Intel DMG, with or without its default x64 suffix." }
           if ($deb.Count -ne 1) { throw "Release must contain exactly one Linux .deb for version $version." }
