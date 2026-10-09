@@ -1,4 +1,4 @@
-// src/components/Header.tsx
+// Renders the application header and its primary actions and status indicators.
 import { useTranslation } from "react-i18next";
 import type { RefObject } from "react";
 import { formatDateTime } from "../i18n/format";

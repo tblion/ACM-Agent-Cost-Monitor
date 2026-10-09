@@ -1,4 +1,4 @@
-// src/components/SessionTable.tsx
+// Displays sessions and their model usage in hierarchical table order.
 import { useState, useMemo } from "react";
 import type { SessionRecord } from "../types";
 import { InfoTooltip } from "./InfoTooltip";

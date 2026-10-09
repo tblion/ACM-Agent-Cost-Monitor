@@ -1,3 +1,4 @@
+// Presents audit diagnostics and supports exporting the generated report.
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { exportAudit, translateApiError } from "../api";

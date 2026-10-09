@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests i18next initialization and language switching.
 
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Exercises application data, settings, audit, and live-mode hooks.
 
 import { act, createElement, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";

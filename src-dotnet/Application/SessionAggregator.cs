@@ -1,3 +1,4 @@
+// Aggregates message usage into session-level cost and token summaries.
 using OpencodeCostsViewer.Backend.Models;
 
 namespace OpencodeCostsViewer.Backend.Application;

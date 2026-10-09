@@ -1,3 +1,4 @@
+// Checks that the application branding assets render in the browser.
 import { expect, test } from "@playwright/test";
 
 test("displays the application logo in the header", async ({ page }) => {

@@ -1,3 +1,4 @@
+// Serializes audit reports as portable JSON or CSV exports.
 import type { AuditMessage, AuditReport } from "../types";
 
 const CSV_COLUMNS = [

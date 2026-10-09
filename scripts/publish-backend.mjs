@@ -1,3 +1,4 @@
+// Publishes the .NET backend for the requested release runtime.
 import { spawnSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { arch, platform } from "node:process";

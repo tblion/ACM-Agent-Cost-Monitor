@@ -1,3 +1,4 @@
+// Represents a database usage row before session aggregation.
 namespace OpencodeCostsViewer.Backend.Models;
 
 internal sealed record UsageRow(

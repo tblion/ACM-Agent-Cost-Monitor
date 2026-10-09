@@ -1,3 +1,4 @@
+// Starts the browser mock server with isolated temporary OpenCode fixtures.
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { once } from "node:events";

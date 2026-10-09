@@ -1,3 +1,4 @@
+// Configures browser-based Playwright end-to-end scenarios.
 import { defineConfig } from "@playwright/test";
 
 if (!process.env.E2E_PORT) throw new Error("E2E_PORT is required; use npm run test:e2e or set it explicitly");

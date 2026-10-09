@@ -1,3 +1,4 @@
+// Selects the platform SQLite provider used by the backend.
 namespace OpencodeCostsViewer.Backend.Infrastructure;
 
 internal static class SqliteProvider

@@ -1,3 +1,4 @@
+// Composes backend services and manages their runtime lifecycle.
 using OpencodeCostsViewer.Backend.Infrastructure;
 using OpencodeCostsViewer.Backend.Models;
 using OpencodeCostsViewer.Backend.Protocol;

@@ -1,3 +1,4 @@
+// Defines message envelopes exchanged with the backend over JSON Lines.
 import type { ApiError } from "../src/types";
 
 export const BACKEND_PROTOCOL_VERSION = 1;

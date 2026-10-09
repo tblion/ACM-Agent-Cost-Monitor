@@ -1,4 +1,4 @@
-// src/components/RatesModal.tsx
+// Displays pricing rates and lets users recalculate costs from the catalog.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogStatus, CostSummary, RateEntry, RecalculationDiagnostics, SessionRecord } from "../types";
 import type { AppDataSource } from "../data-source";

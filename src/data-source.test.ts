@@ -1,3 +1,4 @@
+// Tests source selection and data operations exposed to the renderer.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAuditReport, getCostSummary, getData, getRates, getCatalogStatus, recalculateData } from "./api";
 import {

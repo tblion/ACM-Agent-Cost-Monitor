@@ -1,3 +1,4 @@
+// Verifies dashboard date filters in the browser-based application.
 import { expect, test } from "@playwright/test";
 import { readFixtureManifest } from "./fixtures/isolated-fixture";
 

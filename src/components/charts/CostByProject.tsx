@@ -1,4 +1,4 @@
-// src/components/charts/CostByProject.tsx
+// Compares usage cost across projects or the active custom project group.
 import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { byProjectSelection, isProjectGroupKey, projectSelectionLabel } from "../../lib/aggregate";

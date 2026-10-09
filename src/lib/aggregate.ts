@@ -1,3 +1,4 @@
+// Filters sessions and computes dashboard aggregates from usage records.
 import type { CostSource, SessionRecord, Tokens, CustomGroup } from "../types";
 
 // projects/models/providers:

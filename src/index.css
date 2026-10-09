@@ -1,4 +1,4 @@
-/* src/index.css */
+/* Defines global layout, theme, and platform-specific styles. */
 :root {
   --bg: #f5f6f8; --panel: #ffffff; --border: #e3e6ea;
   --text: #1a1d21; --muted: #6b7280; --text-subtle: #4b5563;

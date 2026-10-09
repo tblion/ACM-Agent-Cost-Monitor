@@ -1,3 +1,4 @@
+// Measures the size and runtime details of published .NET backend bundles.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:process";

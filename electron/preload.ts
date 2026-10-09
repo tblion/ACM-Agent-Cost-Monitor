@@ -1,3 +1,4 @@
+// Exposes the narrow, typed desktop API to the isolated renderer context.
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 import type { ApiError } from "../src/types";

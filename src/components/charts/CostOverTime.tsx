@@ -1,4 +1,4 @@
-// src/components/charts/CostOverTime.tsx
+// Plots usage cost over time for the selected period.
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import type { SessionRecord } from "../../types";
 import { InfoTooltip } from "../InfoTooltip";

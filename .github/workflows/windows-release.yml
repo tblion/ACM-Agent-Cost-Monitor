@@ -1,3 +1,4 @@
+# Rebuilds Windows installers for an existing application release.
 name: Rebuild Windows release installers
 
 on:

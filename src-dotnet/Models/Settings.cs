@@ -1,3 +1,4 @@
+// Defines persisted application preferences and resolved path data.
 using System.Text.Json.Serialization;
 
 namespace OpencodeCostsViewer.Backend.Models;

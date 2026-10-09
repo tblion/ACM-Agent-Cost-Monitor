@@ -1,3 +1,4 @@
+// Coordinates database reads and report generation for audit requests.
 using Microsoft.Data.Sqlite;
 using OpencodeCostsViewer.Backend.Infrastructure;
 using OpencodeCostsViewer.Backend.Models;

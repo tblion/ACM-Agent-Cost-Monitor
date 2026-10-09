@@ -1,3 +1,4 @@
+// Watches the OpenCode database for changes and emits debounced notifications.
 using System.Threading.Channels;
 using OpencodeCostsViewer.Backend.Protocol;
 

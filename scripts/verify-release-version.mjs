@@ -1,3 +1,4 @@
+// Checks that release version metadata agrees across project manifests.
 import { readFileSync } from "node:fs";
 
 const tag = process.env.RELEASE_TAG;

@@ -1,3 +1,4 @@
+// Maps renderer commands to the mock or Electron desktop API.
 import type { DesktopApi } from "../electron/renderer-api";
 import { invoke as invokeMock, listen as listenMock } from "./mock/desktop-mock";
 import type {

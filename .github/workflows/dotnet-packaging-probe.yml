@@ -1,3 +1,4 @@
+# Measures published backend size and runtime information across platforms.
 name: Measure .NET backend packaging
 
 on:

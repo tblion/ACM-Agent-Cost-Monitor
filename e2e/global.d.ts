@@ -1,3 +1,4 @@
+// Adds the isolated desktop API type to the Playwright page window.
 import type { DesktopApi } from "../electron/renderer-api";
 
 declare global {

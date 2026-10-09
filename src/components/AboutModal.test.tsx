@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests the about dialog content and accessible interactions.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

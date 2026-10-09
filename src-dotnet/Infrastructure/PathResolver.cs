@@ -1,3 +1,4 @@
+// Resolves OpenCode data, configuration, and application settings paths.
 using OpencodeCostsViewer.Backend.Models;
 
 namespace OpencodeCostsViewer.Backend.Infrastructure;

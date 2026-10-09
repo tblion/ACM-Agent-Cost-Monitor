@@ -1,3 +1,4 @@
+// Configures Playwright scenarios that launch the Electron application.
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({

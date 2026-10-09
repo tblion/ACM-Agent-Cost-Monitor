@@ -1,3 +1,4 @@
+// Serializes protocol responses and events to the output stream.
 using System.Text.Json;
 
 namespace OpencodeCostsViewer.Backend.Protocol;

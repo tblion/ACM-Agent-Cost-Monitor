@@ -1,3 +1,4 @@
+// Tracks audit visibility, freshness, and report generations.
 import { useEffect, useRef, useState } from "react";
 
 export function useAudit() {

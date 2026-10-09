@@ -1,3 +1,4 @@
+// Defines audit report and diagnostic data transferred to the renderer.
 namespace OpencodeCostsViewer.Backend.Models;
 
 public enum AuditCostSource

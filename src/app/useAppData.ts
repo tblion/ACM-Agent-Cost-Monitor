@@ -1,3 +1,4 @@
+// Loads usage data and coordinates data-mode changes and refreshes.
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getRuntimeMetrics, translateApiError } from "../api";

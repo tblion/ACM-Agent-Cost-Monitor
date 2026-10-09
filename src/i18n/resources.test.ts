@@ -1,3 +1,4 @@
+// Checks translation resource completeness and key consistency.
 import { beforeEach, describe, expect, it } from "vitest";
 import i18n, { i18nReady } from "./config";
 import { resources } from "./resources";

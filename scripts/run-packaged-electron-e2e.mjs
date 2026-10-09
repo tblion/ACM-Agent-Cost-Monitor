@@ -1,3 +1,4 @@
+// Builds or locates a packaged app and runs its Electron E2E scenarios.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

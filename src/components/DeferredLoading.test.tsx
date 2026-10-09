@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Checks loading placeholder variants and accessible status text.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

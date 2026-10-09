@@ -1,3 +1,4 @@
+// Tests pricing keys and rate comparison behavior.
 import { describe, expect, it } from "vitest";
 import { getFocusTrapTarget, rateKey, isConfiguredRate } from "./rates";
 

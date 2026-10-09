@@ -1,3 +1,4 @@
+// Tests API command dispatch, payload decoding, and error translation.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { exportAudit, getAuditReport, isApiError, saveSettings, translateApiError } from "./api";
 import type { DesktopApi } from "../electron/renderer-api";

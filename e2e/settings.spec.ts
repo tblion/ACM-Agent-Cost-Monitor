@@ -1,3 +1,4 @@
+// Verifies settings and data-mode workflows in the browser application.
 import { expect, test } from "@playwright/test";
 import { FIXTURE_ID, FIXTURE_SHA256, readFixtureManifest } from "./fixtures/isolated-fixture";
 

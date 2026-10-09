@@ -1,3 +1,4 @@
+// Provides a representative audit report fixture for demo scenarios.
 import type { AuditReport } from "../types";
 
 export const DEMO_AUDIT_REPORT: AuditReport = {

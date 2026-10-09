@@ -1,7 +1,7 @@
+// Configures the renderer for browser development with deterministic demo data.
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Vite config for running the frontend in a standard browser with demo data.
 export default defineConfig(() => ({
   plugins: [react()],
   define: {

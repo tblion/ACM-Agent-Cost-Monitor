@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests multi-select selection, grouping, keyboard, and dismissal behavior.
 
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";

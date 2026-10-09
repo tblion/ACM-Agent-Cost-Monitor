@@ -1,3 +1,4 @@
+// Owns the Electron window, validates renderer IPC, and supervises backend access.
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { IpcMainInvokeEvent, OpenDialogOptions } from "electron";
 import { writeFile } from "node:fs/promises";
@@ -63,6 +64,7 @@ const backend = new BackendProcess({
 });
 
 ipcMain.handle(IPC_CHANNELS.invokeBackend, async (event, operation: unknown, args: unknown) => {
+  // Validate the sender and operation at the main-process boundary before dispatching.
   if (!isTrustedSender(event)) {
     return failure({ code: "invalid_input", message: "Untrusted IPC sender." });
   }

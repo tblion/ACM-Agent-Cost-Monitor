@@ -1,3 +1,4 @@
+// Lets users create and edit named groups of projects.
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "./ConfirmDialog";

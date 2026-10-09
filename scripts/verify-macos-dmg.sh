@@ -1,3 +1,4 @@
+# Verifies the contents and launch behavior of the generated macOS disk image.
 set -euo pipefail
 
 shopt -s nullglob

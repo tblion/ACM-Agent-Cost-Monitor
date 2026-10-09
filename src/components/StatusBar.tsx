@@ -1,3 +1,4 @@
+// Shows the active data source and its current status.
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "../i18n/format";
 import { languageLocale, resolveLanguage } from "../i18n/locale";

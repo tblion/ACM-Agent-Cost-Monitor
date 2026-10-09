@@ -1,4 +1,4 @@
-// src/components/charts/CostByGroup.tsx
+// Compares usage cost across project groups.
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { byGroup } from "../../lib/aggregate";
 import type { SessionRecord, CustomGroup } from "../../types";

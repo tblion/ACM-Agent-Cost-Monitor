@@ -1,4 +1,4 @@
-// src/components/charts/CostByProvider.tsx
+// Renders total usage cost grouped by provider.
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { byProvider } from "../../lib/aggregate";
 import type { SessionRecord } from "../../types";

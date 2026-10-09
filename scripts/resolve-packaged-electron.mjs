@@ -1,3 +1,4 @@
+// Locates the packaged Electron executable for the current platform.
 import { existsSync, readdirSync } from "node:fs";
 import { arch, platform } from "node:process";
 import path from "node:path";

@@ -1,3 +1,4 @@
+// Declares the shared renderer and desktop API data contracts.
 import type { SupportedLanguage } from "./i18n/locale";
 
 export interface Tokens { input: number; output: number; cacheRead: number; cacheWrite: number; reasoning: number; }

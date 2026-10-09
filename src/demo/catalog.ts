@@ -1,3 +1,4 @@
+// Provides a stable sample pricing catalog for demo mode.
 import type { RateEntry } from "../types";
 
 export interface DemoModelPricing {

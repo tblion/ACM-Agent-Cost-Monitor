@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests project group creation, editing, and selection workflows.
 
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";

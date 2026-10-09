@@ -1,3 +1,4 @@
+<!-- Defines the .NET backend build and publish configuration. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

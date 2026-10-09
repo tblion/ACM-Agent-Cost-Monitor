@@ -1,3 +1,4 @@
+// Builds audit reports from database records and pricing diagnostics.
 using System.Globalization;
 using OpencodeCostsViewer.Backend.Infrastructure;
 using OpencodeCostsViewer.Backend.Models;

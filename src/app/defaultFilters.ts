@@ -1,3 +1,4 @@
+// Builds the initial dashboard filters from usage data and configured period.
 import { endOfLocalDay, MAX_PERIOD_DAYS, startOfLocalDay, type Filters } from "../lib/aggregate";
 import type { SessionRecord } from "../types";
 

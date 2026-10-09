@@ -1,5 +1,4 @@
-// src/components/charts/chartTheme.ts
-// Shared style for Recharts tooltips, adapting to the dark/light theme via CSS vars.
+// Shares Recharts tooltip styling that adapts to the active color theme.
 export const tooltipStyle: React.CSSProperties = {
   background: "var(--panel)",
   border: "1px solid var(--border)",

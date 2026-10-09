@@ -1,3 +1,4 @@
+// Visualizes token usage split between free and paid sessions.
 import { Pie, PieChart, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { useTranslation } from "react-i18next";
 import type { SessionRecord } from "../../types";

@@ -1,3 +1,4 @@
+// Runs the backend request loop and publishes asynchronous events.
 using System.Text.Json;
 
 namespace OpencodeCostsViewer.Backend.Protocol;

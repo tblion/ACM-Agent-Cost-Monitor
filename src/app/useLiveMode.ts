@@ -1,3 +1,4 @@
+// Manages live database watching and its persisted settings state.
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { onDbChanged, translateApiError } from "../api";

@@ -1,3 +1,4 @@
+// Tests date boundaries, session filtering, and usage aggregation helpers.
 import { describe, it, expect } from "vitest";
 import { endOfLocalDay, filterSessions, formatLocalDate, startOfLocalDay, sumCost, costBySource, byProject, byProjectSelection, isProjectGroupKey, projectSelectionLabel, byModel, byProvider, tokenTotals, topSessions, byGroup, usageByBillingType } from "./aggregate";
 import { buildProjectFilterOptions, resolveProjectSelection } from "./projectFilters";

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Verifies confirmation dialog keyboard, focus, and action behavior.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

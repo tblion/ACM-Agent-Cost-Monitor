@@ -1,8 +1,7 @@
-// src/components/MultiSelect.tsx
-// Fully controlled component.
+// Provides a controlled multi-select with optional grouped selection behavior.
 // selected stores currently checked values; grouped mode uses a group value instead of its members.
-// [] means none, and all selectable values means all.
-// "Select all" checks/unchecks everything. "Clear" empties the selection.
+// An empty selection means none; the complete selectable set represents all.
+// "Select all" toggles the complete set, while "Clear" empties the selection.
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

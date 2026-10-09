@@ -1,3 +1,4 @@
+// Defines the validated IPC channels and result envelope shared by Electron processes.
 import type { ApiError } from "../src/types";
 
 export type IpcResult<T> =

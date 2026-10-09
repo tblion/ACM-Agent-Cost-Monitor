@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests status bar labels for supported data sources and states.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

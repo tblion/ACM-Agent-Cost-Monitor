@@ -1,3 +1,4 @@
+// Reads OpenCode configuration and extracts supported pricing settings.
 using System.Text.Json;
 using OpencodeCostsViewer.Backend.Models;
 

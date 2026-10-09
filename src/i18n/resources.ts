@@ -1,3 +1,4 @@
+// Contains the localized interface messages for supported languages.
 const french = {
   app: {
     loading: "Chargement…",

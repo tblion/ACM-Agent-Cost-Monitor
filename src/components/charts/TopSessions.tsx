@@ -1,4 +1,4 @@
-// src/components/charts/TopSessions.tsx
+// Ranks sessions by cost and displays the highest-cost entries.
 import { topSessions } from "../../lib/aggregate";
 import type { SessionRecord } from "../../types";
 import { InfoTooltip } from "../InfoTooltip";

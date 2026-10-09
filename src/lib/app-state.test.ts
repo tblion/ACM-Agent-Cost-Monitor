@@ -1,3 +1,4 @@
+// Tests derived application-state helpers.
 import { describe, expect, it } from "vitest";
 import { isLiveAvailable } from "./app-state";
 

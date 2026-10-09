@@ -1,3 +1,4 @@
+// Calculates message costs from token counts and per-million-token rates.
 using OpencodeCostsViewer.Backend.Models;
 
 namespace OpencodeCostsViewer.Backend.Application;
@@ -14,6 +15,7 @@ internal static class CostCalculator
         var output = tokens.Output * rate.Output / TokensPerRateUnit;
         var cacheRead = tokens.CacheRead * rate.CacheRead / TokensPerRateUnit;
         var cacheWrite = tokens.CacheWrite * rate.CacheWrite / TokensPerRateUnit;
+        // Reasoning tokens follow the output rate in the pricing model.
         var reasoning = tokens.Reasoning * rate.Output / TokensPerRateUnit;
         var total = input + output + cacheRead + cacheWrite + reasoning;
         if (!double.IsFinite(total))

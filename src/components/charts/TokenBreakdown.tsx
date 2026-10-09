@@ -1,4 +1,4 @@
-// src/components/charts/TokenBreakdown.tsx
+// Visualizes token usage by token category for the filtered sessions.
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { tokenTotals } from "../../lib/aggregate";
 import type { SessionRecord } from "../../types";

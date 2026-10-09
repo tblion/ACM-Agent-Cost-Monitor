@@ -1,3 +1,4 @@
+// Formats dates, numbers, and currency using the selected language.
 import type { SupportedLanguage } from "./locale";
 import { languageLocale } from "./locale";
 import i18n from "./config";

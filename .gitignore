@@ -1,7 +1,7 @@
-# Artefacts de session (brainstorm / visual companion)
+# Excludes generated files, temporary session data, and local development artifacts.
 .superpowers/
 
-# Dependances / build
+# Dependencies and build output.
 node_modules/
 target/
 dist/
@@ -14,7 +14,7 @@ release/
 src-dotnet/publish/
 *.local
 
-# Logs
+# Logs and test reports.
 logs
 *.log
 test-results/
@@ -26,7 +26,7 @@ pnpm-debug.log*
 lerna-debug.log*
 artifacts/packaging-probe/
 
-# Editor directories and files
+# Editor directories and files.
 .vscode/*
 !.vscode/extensions.json
 .idea

@@ -1,3 +1,4 @@
+// Defines session and per-model usage records returned to the renderer.
 namespace OpencodeCostsViewer.Backend.Models;
 
 public enum CostSource

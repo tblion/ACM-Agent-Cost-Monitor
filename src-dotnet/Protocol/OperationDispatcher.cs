@@ -1,3 +1,4 @@
+// Routes protocol operations to backend application services.
 using System.Text.Json;
 using OpencodeCostsViewer.Backend.Application;
 using OpencodeCostsViewer.Backend.Infrastructure;

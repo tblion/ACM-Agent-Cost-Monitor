@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests dashboard filter controls and their change callbacks.
 
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";

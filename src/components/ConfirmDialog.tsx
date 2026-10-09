@@ -1,3 +1,4 @@
+// Implements an accessible confirmation dialog with focus management.
 import { useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { getFocusTrapTarget } from "../lib/rates";
 

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests catalog pricing display and cost recalculation interactions.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

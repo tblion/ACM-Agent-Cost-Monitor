@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Covers dashboard rendering, filtering, and user interactions.
 
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";

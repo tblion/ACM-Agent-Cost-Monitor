@@ -1,3 +1,4 @@
+// Reads and writes application settings in the resolved settings directory.
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpencodeCostsViewer.Backend.Application;

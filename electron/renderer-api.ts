@@ -1,3 +1,4 @@
+// Declares the desktop API contract available to the renderer.
 import type {
   ApiError,
   AuditReport,

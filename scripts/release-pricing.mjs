@@ -1,3 +1,4 @@
+// Prepares and validates the pricing catalog used for a release.
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";

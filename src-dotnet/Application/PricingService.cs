@@ -1,3 +1,4 @@
+// Applies effective pricing rates to stored usage and recalculation requests.
 using System.Globalization;
 using OpencodeCostsViewer.Backend.Models;
 

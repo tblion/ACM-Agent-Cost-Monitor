@@ -1,3 +1,4 @@
+// Starts the mock server on an available port and runs the Playwright suite.
 import net from "node:net";
 import { readFile, unlink } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";

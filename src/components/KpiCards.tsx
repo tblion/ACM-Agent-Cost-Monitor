@@ -1,4 +1,4 @@
-// src/components/KpiCards.tsx
+// Summarizes filtered usage and cost metrics in dashboard cards.
 import type { SessionRecord } from "../types";
 import { sumCost, costBySource, tokenTotals } from "../lib/aggregate";
 import { InfoTooltip } from "./InfoTooltip";

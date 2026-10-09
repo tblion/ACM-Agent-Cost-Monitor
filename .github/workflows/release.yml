@@ -1,3 +1,4 @@
+# Builds and publishes desktop installers for supported operating systems.
 name: Release desktop bundles
 
 on:

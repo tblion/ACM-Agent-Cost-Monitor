@@ -1,3 +1,4 @@
+// Parses incoming protocol messages and validates their envelopes.
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

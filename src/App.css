@@ -1,3 +1,4 @@
+/* Styles dashboard sections, charts, and audit views. */
 .audit-view { display: grid; gap: 16px; padding: 24px 20px 32px; }
 .audit-content:focus { outline: 3px solid var(--accent); outline-offset: -3px; }
 .audit-heading, .audit-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

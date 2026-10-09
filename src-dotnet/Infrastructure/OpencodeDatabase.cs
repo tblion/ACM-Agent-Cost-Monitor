@@ -1,3 +1,4 @@
+// Provides read-only queries over the OpenCode SQLite database.
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using OpencodeCostsViewer.Backend.Models;

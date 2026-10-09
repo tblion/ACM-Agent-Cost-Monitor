@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests project cost chart rendering and group selection behavior.
 
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";

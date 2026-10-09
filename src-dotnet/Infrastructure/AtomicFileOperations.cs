@@ -1,3 +1,4 @@
+// Provides atomic file replacement operations for persisted application data.
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 

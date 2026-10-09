@@ -1,4 +1,4 @@
-// src/App.tsx
+// Composes the dashboard, shared state hooks, and application dialogs.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CustomGroup } from "./types";

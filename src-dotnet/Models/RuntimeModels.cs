@@ -1,3 +1,4 @@
+// Defines backend runtime metrics and status response models.
 namespace OpencodeCostsViewer.Backend.Models;
 
 public sealed record SettingsResponse(Settings Settings, AppError? Diagnostic, bool LiveActive);

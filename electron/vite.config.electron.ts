@@ -1,3 +1,4 @@
+// Configures the Electron main-process TypeScript bundle.
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 

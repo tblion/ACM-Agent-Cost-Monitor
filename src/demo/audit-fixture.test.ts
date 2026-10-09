@@ -1,5 +1,6 @@
 // @ts-expect-error type error without @types/node package
 import { readFileSync } from "node:fs";
+// Tests the shape and invariants of the demo audit fixture.
 import { describe, expect, it } from "vitest";
 import { DEMO_AUDIT_REPORT } from "./audit-fixture";
 import type { AuditReport } from "../types";

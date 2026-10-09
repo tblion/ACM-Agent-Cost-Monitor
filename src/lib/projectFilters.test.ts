@@ -1,3 +1,4 @@
+// Tests project filter options, group selections, and reconciliation.
 import { describe, expect, it } from "vitest";
 import type { CustomGroup } from "../types";
 import {

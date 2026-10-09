@@ -1,3 +1,4 @@
+// Verifies live database refresh and watcher state through the browser UI.
 import { expect, test } from "@playwright/test";
 
 test.describe("live mode", () => {

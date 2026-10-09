@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests audit report loading, rendering, stale state, and export actions.
 
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";

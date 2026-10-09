@@ -1,3 +1,4 @@
+// Generates deterministic sample usage and audit data for demo mode.
 import type { AuditReport, CostSummary, ModelUsage, RecalculationResult, SessionRecord, Tokens } from "../types";
 import { DEMO_HISTORICAL_PRICING, DEMO_PRICING, DEMO_RATES, type DemoModelPricing } from "./catalog";
 import { DEMO_AUDIT_REPORT } from "./audit-fixture";

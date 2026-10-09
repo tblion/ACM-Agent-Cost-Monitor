@@ -1,3 +1,4 @@
+// Tests display-name normalization and value sorting.
 import { describe, expect, it } from "vitest";
 import { compareDisplayNames, displayName, sortDisplayValues } from "./sorting";
 

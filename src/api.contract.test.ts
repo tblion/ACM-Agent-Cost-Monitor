@@ -1,3 +1,4 @@
+// Verifies that renderer commands remain aligned with the desktop API contract.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import contractFixture from "./fixtures/api-contract.json";
 import { decodeApiPayload, getLegacySettings, getSettings, getSettingsStatus, invokeCommand } from "./api";

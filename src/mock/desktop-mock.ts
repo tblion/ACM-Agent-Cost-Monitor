@@ -1,4 +1,4 @@
-// Provide deterministic desktop API responses for browser demo and E2E modes.
+// Implements deterministic desktop API responses for browser demo and E2E modes.
 import type { RuntimeMetrics, Settings, SettingsResponse, ResolvedPaths, SessionRecord } from "../types";
 import { DEMO_AUDIT_REPORT } from "../demo/audit-fixture";
 import { createDemoRecalculationResult, generateDemoSnapshot, type DemoSnapshot } from "../demo/generator";

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests header status indicators and action controls.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

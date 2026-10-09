@@ -1,3 +1,4 @@
+// Loads, saves, and exposes application settings state.
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getSettingsStatus, saveSettings, translateApiError } from "../api";

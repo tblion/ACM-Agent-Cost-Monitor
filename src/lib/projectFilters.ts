@@ -1,3 +1,4 @@
+// Builds and reconciles project and custom-group filter selections.
 import type { CustomGroup } from "../types";
 import { displayName, sortDisplayValues } from "./sorting";
 

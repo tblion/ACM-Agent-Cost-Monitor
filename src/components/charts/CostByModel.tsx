@@ -1,4 +1,4 @@
-// src/components/charts/CostByModel.tsx
+// Compares usage cost across models.
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { byModel } from "../../lib/aggregate";
 import type { SessionRecord } from "../../types";

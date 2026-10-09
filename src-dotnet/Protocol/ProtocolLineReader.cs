@@ -1,3 +1,4 @@
+// Reads bounded newline-delimited requests from the protocol input stream.
 using System.Text;
 
 namespace OpencodeCostsViewer.Backend.Protocol;

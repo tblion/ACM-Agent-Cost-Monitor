@@ -1,3 +1,4 @@
+// Removes JSONC comments and trailing commas before JSON deserialization.
 using System.Text;
 
 namespace OpencodeCostsViewer.Backend.Infrastructure;

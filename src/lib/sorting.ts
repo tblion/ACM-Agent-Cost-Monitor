@@ -1,3 +1,4 @@
+// Provides display labels and locale-aware ordering for dashboard values.
 export function displayName(value: string): string {
   if (/^\/+$/u.test(value)) return "/";
   const windowsRoot = value.match(/^([A-Za-z]:)[\\/]+$/u);

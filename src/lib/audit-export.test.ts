@@ -1,3 +1,4 @@
+// Verifies audit report serialization and escaping for supported export formats.
 import { describe, expect, it } from "vitest";
 import { serializeAuditReportCsv, serializeAuditReportJson } from "./audit-export";
 import type { AuditReport } from "../types";

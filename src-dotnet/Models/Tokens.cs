@@ -1,3 +1,4 @@
+// Defines token counts, model rates, and message cost breakdowns.
 using System.Text.Json.Serialization;
 
 namespace OpencodeCostsViewer.Backend.Models;

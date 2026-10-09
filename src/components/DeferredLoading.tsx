@@ -1,3 +1,4 @@
+// Renders localized loading placeholders for deferred content.
 import { useTranslation } from "react-i18next";
 
 type DeferredLoadingProps = {

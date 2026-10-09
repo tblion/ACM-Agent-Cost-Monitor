@@ -1,6 +1,4 @@
-// src/components/InfoTooltip.tsx
-// "i" button with an information tooltip on hover/focus, reusable everywhere.
-// The tooltip is positioned below the button.
+// Provides a reusable information button with a hover- and focus-triggered tooltip.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 

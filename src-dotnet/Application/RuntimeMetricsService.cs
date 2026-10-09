@@ -1,3 +1,4 @@
+// Collects process and optional database runtime metrics.
 using System.Diagnostics;
 using OpencodeCostsViewer.Backend.Models;
 

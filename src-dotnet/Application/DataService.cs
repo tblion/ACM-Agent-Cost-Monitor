@@ -1,3 +1,4 @@
+// Reads OpenCode sessions and maps them into renderer-facing records.
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using OpencodeCostsViewer.Backend.Infrastructure;

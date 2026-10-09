@@ -1,4 +1,4 @@
-// src/components/FilterBar.tsx
+// Collects date, project, model, and provider filters for the dashboard.
 import type { CSSProperties } from "react";
 import { endOfLocalDay, formatLocalDate, startOfLocalDay, type Filters } from "../lib/aggregate";
 import { MultiSelect } from "./MultiSelect";

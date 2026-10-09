@@ -1,3 +1,4 @@
+// Verifies deterministic demo usage generation and derived values.
 import { describe, expect, it } from "vitest";
 import { DEMO_HISTORICAL_PRICING, DEMO_PRICING, DEMO_RATES } from "./catalog";
 import {

@@ -1,3 +1,4 @@
+// Tests the browser mock implementation of the desktop API.
 import { describe, expect, it } from "vitest";
 import { invoke } from "./desktop-mock";
 import { DEMO_AUDIT_REPORT } from "../demo/audit-fixture";

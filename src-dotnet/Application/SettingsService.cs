@@ -1,3 +1,4 @@
+// Validates and persists backend settings and diagnostics.
 using System.ComponentModel;
 using OpencodeCostsViewer.Backend.Application;
 using OpencodeCostsViewer.Backend.Infrastructure;

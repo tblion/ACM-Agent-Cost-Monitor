@@ -1,3 +1,4 @@
+// Defines pricing catalog entries, rates, and their effective dates.
 using System.Text.Json.Serialization;
 
 namespace OpencodeCostsViewer.Backend.Models;

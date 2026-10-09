@@ -1,4 +1,4 @@
-// src/theme.ts
+// Detects the host operating system and applies the selected display theme.
 export type OS = "windows" | "macos" | "linux" | "unknown";
 
 export function detectOS(): OS {

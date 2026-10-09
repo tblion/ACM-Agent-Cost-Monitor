@@ -1,3 +1,4 @@
+<!-- Defines the small executable used to inspect packaged .NET runtimes. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

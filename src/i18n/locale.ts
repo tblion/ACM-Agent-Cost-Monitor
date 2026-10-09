@@ -1,3 +1,4 @@
+// Defines supported UI languages and resolves the active locale.
 export const supportedLanguages = ["fr", "en"] as const;
 export type SupportedLanguage = typeof supportedLanguages[number];
 

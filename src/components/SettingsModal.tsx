@@ -1,4 +1,4 @@
-// src/components/SettingsModal.tsx
+// Edits application preferences, data mode, and live monitoring settings.
 import { useState, useEffect, useRef } from "react";
 import type { Settings, CustomGroup, ResolvedPaths } from "../types";
 import { pickPath, getResolvedPaths, translateApiError } from "../api";

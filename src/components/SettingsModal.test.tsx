@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+// Tests settings editing, validation, and save behavior.
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

@@ -1,3 +1,4 @@
+// Provides stable provider/model keys and pricing comparison helpers.
 export const rateKey = (provider: string, model: string) => `${provider}\u0000${model}`;
 
 export const isConfiguredRate = (configuredKeys: Set<string>, provider: string, model: string) =>

@@ -1,3 +1,4 @@
+// Selects the live desktop API or demo data source for the renderer.
 import * as api from "./api";
 import { createDemoAuditReport, createDemoRecalculationResult, generateDemoSnapshot } from "./demo/generator";
 import { getE2eDemoSnapshot } from "./mock/desktop-mock";

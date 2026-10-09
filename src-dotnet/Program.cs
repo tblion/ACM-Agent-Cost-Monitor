@@ -1,3 +1,4 @@
+// Configures and starts the backend JSON Lines protocol host.
 using OpencodeCostsViewer.Backend.Infrastructure;
 using OpencodeCostsViewer.Backend.Protocol;
 

@@ -1,3 +1,4 @@
+// Creates isolated OpenCode data and settings fixtures for browser E2E tests.
 import { readFile } from "node:fs/promises";
 
 export const FIXTURE_ID = "e2e-sql-v1";

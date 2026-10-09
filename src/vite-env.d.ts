@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+// Extends Vite's renderer types with the isolated Electron desktop API.
 import type { DesktopApi } from "../electron/renderer-api";
 
 declare global {

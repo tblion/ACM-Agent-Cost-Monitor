@@ -1,3 +1,4 @@
+// Removes stale process-signal state left by interrupted E2E runs.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { spawn } from "node:child_process";

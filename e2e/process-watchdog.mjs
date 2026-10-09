@@ -1,3 +1,4 @@
+// Runs a child process and terminates it if the configured watchdog expires.
 import { spawn } from "node:child_process";
 
 const ownerPid = Number(process.argv[2]);
