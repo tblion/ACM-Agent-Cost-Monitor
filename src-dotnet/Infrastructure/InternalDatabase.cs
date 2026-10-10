@@ -452,7 +452,7 @@ internal static class InternalDatabase
         try
         {
             using (var source = Open(DatabasePath))
-            using (var destination = Open(temporaryPath))
+            using (var destination = Open(temporaryPath, pooling: false))
             {
                 source.BackupDatabase(destination);
             }
@@ -579,7 +579,7 @@ internal static class InternalDatabase
         }
     }
 
-    private static SqliteConnection Open(string path)
+    private static SqliteConnection Open(string path, bool pooling = true)
     {
         var fullPath = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(fullPath)
@@ -589,6 +589,7 @@ internal static class InternalDatabase
         {
             DataSource = fullPath,
             Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = pooling,
         }.ToString())
         {
             DefaultTimeout = 5,
