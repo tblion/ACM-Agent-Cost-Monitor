@@ -147,7 +147,7 @@ ipcMain.handle(IPC_CHANNELS.exportInternalStore, async (event) => {
       ? await dialog.showSaveDialog(mainWindow, options)
       : await dialog.showSaveDialog(options);
     if (result.canceled || !result.filePath) return null;
-    await backend.request("export_internal_store", { path: result.filePath });
+    await backend.request<void>("export_internal_store", { path: result.filePath });
     return result.filePath;
   }, "database");
 });

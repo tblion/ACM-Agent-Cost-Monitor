@@ -152,7 +152,7 @@ test("uses the real read-only SQLite backend for costs, rates, summary, audit, a
 
   const internalStore = await page!.evaluate(async () => window.desktopApi!.getInternalStoreStatus());
   expect(internalStore).toMatchObject({ projects: 1, sessions: 3, messages: 4, sources: 1 });
-  expect(internalStore.databasePath).toContain("acm-agent-cost-monitor/agent-usage.sqlite");
+  expect(internalStore.databasePath.replaceAll("\\", "/")).toContain("acm-agent-cost-monitor/agent-usage.sqlite");
   const importChannels = await page!.evaluate(async () => window.desktopApi!.getInternalStoreSources());
   expect(importChannels.map(channel => channel.channelKey).sort()).toEqual(["api", "database"]);
 
