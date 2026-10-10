@@ -15,6 +15,7 @@ import { useAppData } from "./app/useAppData";
 import { useAudit } from "./app/useAudit";
 import { useLiveMode } from "./app/useLiveMode";
 import { useSettings } from "./app/useSettings";
+import { useDatePresetRollover } from "./app/useDatePresetRollover";
 import { defaultFilters } from "./app/defaultFilters";
 import "./App.css";
 
@@ -45,6 +46,7 @@ function reconcileFilters(filters: Filters, previous: ProjectFilterOptions, next
 export default function App() {
   const { t } = useTranslation();
   const [filters, setFilters] = useState<Filters>({});
+  useDatePresetRollover(filters.datePreset, setFilters);
   const [showSettings, setShowSettings] = useState(false);
   const [showRates, setShowRates] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -153,6 +155,7 @@ export default function App() {
         onOpenRates={() => setShowRates(true)}
         onOpenAbout={() => setShowAbout(true)}
         onOpenAudit={() => setShowAudit(current => !current)}
+        onSourceRefreshed={async () => { await appData.reloadData(false); }}
         auditButtonRef={auditButtonRef}
         showAudit={showAudit}
       />
@@ -191,7 +194,7 @@ export default function App() {
       </div>
         {showSettings && (
           <Suspense fallback={<div className="modal-overlay"><DeferredLoading variant="modal" /></div>}>
-             <SettingsModal settings={settings} projects={projects} dataMode={dataMode} onDataModeChange={changeDataModeAndCloseSettings} onClose={() => setShowSettings(false)} onSave={saveSettingsAndClose} />
+              <SettingsModal settings={settings} projects={projects} dataMode={dataMode} onDataModeChange={changeDataModeAndCloseSettings} onClose={() => setShowSettings(false)} onSave={saveSettingsAndClose} onStoreChanged={async () => { await appData.reloadData(false); }} />
           </Suspense>
         )}
       {showRates && (

@@ -16,6 +16,16 @@ public sealed class ModelUsage
     public CostSource Source { get; set; }
 }
 
+public sealed class MessageUsage
+{
+    public long? Date { get; init; }
+    public required string Provider { get; init; }
+    public required string Model { get; init; }
+    public double Cost { get; init; }
+    public Tokens Tokens { get; init; } = new();
+    public CostSource Source { get; init; }
+}
+
 public sealed class SessionRecord
 {
     public required string Id { get; init; }
@@ -28,4 +38,5 @@ public sealed class SessionRecord
     public string? ParentId { get; init; }
     public CostSource Source { get; set; } = CostSource.Configured;
     public List<ModelUsage> Models { get; } = [];
+    public List<MessageUsage> Messages { get; } = [];
 }

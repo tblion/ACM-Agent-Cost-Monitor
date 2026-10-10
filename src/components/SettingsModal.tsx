@@ -1,7 +1,7 @@
 // Edits application preferences, data mode, and live monitoring settings.
 import { useState, useEffect, useRef } from "react";
-import type { Settings, CustomGroup, ResolvedPaths } from "../types";
-import { pickPath, getResolvedPaths, translateApiError } from "../api";
+import type { Settings, CustomGroup, BackendLogEntry, InternalStoreStatus, InternalStoreSource, ResolvedPaths } from "../types";
+import { pickPath, getResolvedPaths, getInternalStoreStatus, getInternalStoreSources, refreshInternalStoreSource, refreshOpenCodeApi, exportInternalStore, mergeInternalStore, getBackendLogs, onBackendLog, translateApiError } from "../api";
 import type { DataMode } from "../data-source";
 import { getFocusTrapTarget } from "../lib/rates";
 import { useTranslation } from "react-i18next";
@@ -15,9 +15,10 @@ interface Props {
   onDataModeChange: (mode: DataMode) => void | Promise<void>;
   onClose: () => void;
   onSave: (s: Settings) => void | Promise<void>;
+  onStoreChanged: () => void | Promise<void>;
 }
 
-export function SettingsModal({ settings, projects, dataMode, onDataModeChange, onClose, onSave }: Props) {
+export function SettingsModal({ settings, projects, dataMode, onDataModeChange, onClose, onSave, onStoreChanged }: Props) {
   const { t } = useTranslation();
   const [s, setS] = useState<Settings>({ ...settings, customGroups: settings.customGroups.map(g => ({ ...g })) });
   const [groups, setGroups] = useState<CustomGroup[]>(s.customGroups);
@@ -28,6 +29,17 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
   const [modeError, setModeError] = useState<string | null>(null);
   const [pathError, setPathError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [storeStatus, setStoreStatus] = useState<InternalStoreStatus | null>(null);
+  const [storeError, setStoreError] = useState<string | null>(null);
+  const [storeMessage, setStoreMessage] = useState<string | null>(null);
+  const [storeBusy, setStoreBusy] = useState(false);
+  const [integrationChannels, setIntegrationChannels] = useState<InternalStoreSource[]>([]);
+  const [channelBusy, setChannelBusy] = useState<string | null>(null);
+  const [channelError, setChannelError] = useState<string | null>(null);
+  const [showBackendLogs, setShowBackendLogs] = useState(false);
+  const [backendLogs, setBackendLogs] = useState<BackendLogEntry[]>([]);
+  const [backendLogsError, setBackendLogsError] = useState<string | null>(null);
+  const backendLogOutputRef = useRef<HTMLPreElement>(null);
   const [saving, setSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const disposedRef = useRef(false);
@@ -47,7 +59,37 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
     getResolvedPaths()
       .then(value => { if (!disposedRef.current) setResolved(value); })
       .catch(() => {});
-  }, []);
+    getInternalStoreStatus()
+      .then(value => { if (!disposedRef.current) setStoreStatus(value); })
+      .catch(error => {
+        if (!disposedRef.current) setStoreError(translateApiError(error, key => t(key as never), t("settings.storeError")));
+      });
+    getInternalStoreSources()
+      .then(value => { if (!disposedRef.current) setIntegrationChannels(value); })
+      .catch(error => {
+        if (!disposedRef.current) setChannelError(translateApiError(error, key => t(key as never), t("settings.integrationLoadError")));
+      });
+  }, [t]);
+
+  useEffect(() => {
+    if (!showBackendLogs) return;
+    let active = true;
+    const unsubscribe = onBackendLog(entry => {
+      if (active) setBackendLogs(current => [...current, entry].slice(-2000));
+    });
+    getBackendLogs()
+      .then(entries => { if (active) setBackendLogs(entries.slice(-2000)); })
+      .catch(error => {
+        if (active) setBackendLogsError(translateApiError(error, key => t(key as never), t("settings.logsError")));
+      });
+    return () => { active = false; unsubscribe(); };
+  }, [showBackendLogs, t]);
+
+  useEffect(() => {
+    if (showBackendLogs && backendLogOutputRef.current) {
+      backendLogOutputRef.current.scrollTop = backendLogOutputRef.current.scrollHeight;
+    }
+  }, [backendLogs, showBackendLogs]);
 
   // Focus trap + Escape handling + focus restoration on close.
   useEffect(() => {
@@ -70,6 +112,24 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
   }, []);
 
   const set = (patch: Partial<Settings>) => setS(prev => ({ ...prev, ...patch }));
+
+  const refreshChannel = async (channel: InternalStoreSource) => {
+    const key = channel.channelKey;
+    setChannelBusy(key);
+    setChannelError(null);
+    try {
+      if (key === "api") await refreshOpenCodeApi();
+      else await refreshInternalStoreSource(channel.sourceId);
+      await onStoreChanged();
+    } catch (error) {
+      if (!disposedRef.current) setChannelError(translateApiError(error, value => t(value as never), t("settings.integrationRefreshError")));
+    } finally {
+      if (!disposedRef.current) {
+        setIntegrationChannels(await getInternalStoreSources().catch(() => integrationChannels));
+        setChannelBusy(null);
+      }
+    }
+  };
 
   const pick = async (field: "dbPath" | "configPath") => {
     if (disposedRef.current) return;
@@ -108,6 +168,41 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
     }
   };
 
+  const exportStore = async () => {
+    if (disposedRef.current) return;
+    setStoreBusy(true);
+    setStoreError(null);
+    setStoreMessage(null);
+    try {
+      const path = await exportInternalStore();
+      if (disposedRef.current || !path) return;
+      setStoreMessage(t("settings.storeExportSuccess", { path }));
+      setStoreStatus(await getInternalStoreStatus());
+    } catch (error) {
+      if (!disposedRef.current) setStoreError(translateApiError(error, key => t(key as never), t("settings.storeError")));
+    } finally {
+      if (!disposedRef.current) setStoreBusy(false);
+    }
+  };
+
+  const mergeStore = async () => {
+    if (disposedRef.current) return;
+    setStoreBusy(true);
+    setStoreError(null);
+    setStoreMessage(null);
+    try {
+      const result = await mergeInternalStore();
+      if (disposedRef.current || !result) return;
+      setStoreStatus(await getInternalStoreStatus());
+      await onStoreChanged();
+      if (!disposedRef.current) setStoreMessage(t("settings.storeMergeSuccess", { ...result }));
+    } catch (error) {
+      if (!disposedRef.current) setStoreError(translateApiError(error, key => t(key as never), t("settings.storeError")));
+    } finally {
+      if (!disposedRef.current) setStoreBusy(false);
+    }
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}
          onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -126,6 +221,86 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
           <button onClick={() => pick("dbPath")} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>{t("settings.browse")}</button>
         </div>
          {pathError && <p role="alert" style={{ color: "var(--error)", fontSize: 12 }}>{t(pathError, { defaultValue: pathError })}</p>}
+
+         <section aria-labelledby="integrations-title" style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 16 }}>
+           <h3 id="integrations-title" style={{ margin: "0 0 8px", fontSize: 13 }}>{t("settings.integrations")}</h3>
+           <article aria-labelledby="opencode-integration-title">
+             <h4 id="opencode-integration-title" style={{ margin: "0 0 8px", fontSize: 12 }}>OpenCode</h4>
+             <p style={{ margin: "0 0 8px", color: "var(--muted)", fontSize: 10 }}>{t("settings.integrationLiveInfo")}</p>
+             {integrationChannels.map(channel => <div key={channel.channelKey} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+               <div style={{ minWidth: 0 }}>
+                 <strong style={{ display: "block", fontSize: 11 }}>{channel.channelKey === "api" ? t("header.opencodeApi") : t("header.databaseChannel")}</strong>
+                 <span title={channel.sourcePath} style={{ display: "block", color: "var(--muted)", fontSize: 10, overflowWrap: "anywhere" }}>{channel.sourcePath}</span>
+                 <span style={{ display: "block", color: channel.lastSyncError ? "var(--error)" : "var(--muted)", fontSize: 10 }}>
+                   {channel.lastSyncError
+                     ? t("settings.integrationChannelError", { details: channel.lastSyncError })
+                     : t("settings.integrationChannelUpdated", { value: channel.lastImportedAt ? new Date(channel.lastImportedAt).toLocaleString() : t("header.sourceNeverUpdated") })}
+                 </span>
+               </div>
+               <button type="button" onClick={() => void refreshChannel(channel)} disabled={channelBusy !== null} aria-busy={channelBusy === channel.channelKey}>
+                 {channelBusy === channel.channelKey ? t("header.sourceRefreshing") : t("header.sourceRefresh")}
+               </button>
+             </div>)}
+             {integrationChannels.length === 0 && <p style={{ color: "var(--muted)", fontSize: 11 }}>{t("settings.integrationLoading")}</p>}
+             {channelError && <p role="alert" style={{ color: "var(--error)", fontSize: 11 }}>{channelError}</p>}
+           </article>
+         </section>
+
+        <section aria-labelledby="internal-store-title" aria-busy={storeBusy} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 16 }}>
+          <h3 id="internal-store-title" style={{ margin: "0 0 6px", fontSize: 13 }}>{t("settings.internalStore")}</h3>
+          <p style={{ margin: "0 0 6px", fontSize: 11, color: "var(--muted)", overflowWrap: "anywhere" }}>
+            {storeStatus?.databasePath ?? t("settings.storeLoading")}
+          </p>
+          {storeStatus && <p style={{ margin: "0 0 8px", fontSize: 11, color: "var(--muted)" }}>
+            {t("settings.storeCounts", {
+              projects: storeStatus.projects,
+              sessions: storeStatus.sessions,
+              messages: storeStatus.messages,
+              sources: storeStatus.sources,
+            })}
+          </p>}
+          {storeStatus?.lastSyncError && <p role="status" style={{ margin: "0 0 8px", fontSize: 11, color: "var(--error)" }}>
+            {t("settings.storeSyncWarning", { details: storeStatus.lastSyncError })}
+          </p>}
+          <p style={{ margin: "0 0 10px", fontSize: 11, color: "var(--muted)" }}>{t("settings.storeMergeExplanation")}</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => void exportStore()} disabled={storeBusy} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", fontSize: 11, cursor: storeBusy ? "wait" : "pointer" }}>
+              {storeBusy ? t("settings.storeWorking") : t("settings.storeExport")}
+            </button>
+            <button onClick={() => void mergeStore()} disabled={storeBusy} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", fontSize: 11, cursor: storeBusy ? "wait" : "pointer" }}>
+              {storeBusy ? t("settings.storeWorking") : t("settings.storeMerge")}
+            </button>
+          </div>
+          <button
+            type="button"
+            aria-expanded={showBackendLogs}
+            aria-controls="backend-log-output"
+            onClick={() => { setBackendLogsError(null); setShowBackendLogs(value => !value); }}
+            style={{ marginTop: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px", fontSize: 11, cursor: "pointer" }}
+          >
+            {showBackendLogs ? t("settings.hideLogs") : t("settings.showLogs")}
+          </button>
+          {showBackendLogs && <>
+            {backendLogsError && <p role="alert" style={{ color: "var(--error)", fontSize: 12 }}>{backendLogsError}</p>}
+            <pre
+              id="backend-log-output"
+              ref={backendLogOutputRef}
+              role="log"
+              aria-label={t("settings.logsTitle")}
+              aria-live="off"
+              tabIndex={0}
+              style={{ maxHeight: 240, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: 10, margin: "10px 0 0", font: "11px/1.5 ui-monospace, SFMono-Regular, monospace", color: "var(--text)" }}
+            >
+              {backendLogs.length > 0
+                ? backendLogs.map(entry => `${entry.timestamp} [${entry.level}] ${entry.message}${entry.exception ? `\n${entry.exception}` : ""}`).join("\n")
+                : t("settings.logsEmpty")}
+            </pre>
+          </>}
+          {storeError && <p role="alert" style={{ color: "var(--error)", fontSize: 12 }}>{storeError}</p>}
+          <p role="status" style={{ color: "var(--live)", fontSize: 12, margin: storeMessage ? "8px 0 0" : 0 }}>
+            {storeMessage ?? ""}
+          </p>
+        </section>
 
         <label htmlFor="config-path" style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{t("settings.configPath")}</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>

@@ -13,6 +13,14 @@ import { SettingsModal } from "./SettingsModal";
 
 vi.mock("../api", () => ({
   getResolvedPaths: vi.fn().mockResolvedValue({ db: "/db", config: "/config" }),
+  getInternalStoreStatus: vi.fn().mockResolvedValue({ databasePath: "/store.sqlite", projects: 1, sessions: 2, messages: 3, sources: 1, lastImportedAt: null }),
+  getInternalStoreSources: vi.fn().mockResolvedValue([]),
+  refreshInternalStoreSource: vi.fn().mockResolvedValue(undefined),
+  refreshOpenCodeApi: vi.fn().mockResolvedValue(undefined),
+  getBackendLogs: vi.fn().mockResolvedValue([]),
+  onBackendLog: vi.fn(() => vi.fn()),
+  exportInternalStore: vi.fn().mockResolvedValue(null),
+  mergeInternalStore: vi.fn().mockResolvedValue(null),
   pickPath: vi.fn(),
   translateApiError: (_error: unknown, _translate: (key: string) => string, fallback?: string) => fallback ?? "error",
 }));
@@ -41,6 +49,7 @@ async function renderModal(customGroups: Settings["customGroups"], onSave = vi.f
       onDataModeChange: vi.fn(),
       onClose: vi.fn(),
       onSave,
+      onStoreChanged: vi.fn(),
     })));
   });
   return container;

@@ -16,7 +16,7 @@ internal sealed record UsageRow(
 
 internal sealed record IgnoredRow(string MessageId, string SessionId, string Role);
 
-internal sealed record DatabaseSessionRow(string SessionId, string Project, string Title, string? ParentId);
+internal sealed record DatabaseSessionRow(string SessionId, string Project, string Title, string? ParentId, long Date);
 
 internal sealed record DatabaseAuditSnapshot(
     List<UsageRow> Rows,

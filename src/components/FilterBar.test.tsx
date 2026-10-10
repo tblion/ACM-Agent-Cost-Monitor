@@ -7,7 +7,7 @@ import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../i18n/config";
 import { buildProjectFilterOptions } from "../lib/projectFilters";
-import type { Filters } from "../lib/aggregate";
+import { dateRangeForPreset, endOfLocalDay, startOfLocalDay, type Filters } from "../lib/aggregate";
 import { FilterBar } from "./FilterBar";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -93,6 +93,66 @@ describe("FilterBar project groups", () => {
 
     expect((container.querySelector("#filter-start-date") as HTMLInputElement).value).not.toBe("");
     expect((container.querySelector("#filter-end-date") as HTMLInputElement).value).not.toBe("");
+  });
+
+  it("applique une période calendaire complète depuis le sélecteur", async () => {
+    const onChange = vi.fn();
+    const { container } = await renderFilterBar({}, onChange);
+    const preset = container.querySelector("#filter-date-preset") as HTMLSelectElement;
+    const range = dateRangeForPreset("thisWeek");
+
+    await act(async () => {
+      preset.value = "thisWeek";
+      preset.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ ...range, datePreset: "thisWeek" }));
+  });
+
+  it("efface les deux bornes avec le préréglage toutes les dates", async () => {
+    const onChange = vi.fn();
+    const { container } = await renderFilterBar({ from: 1, to: 2 }, onChange);
+    const preset = container.querySelector("#filter-date-preset") as HTMLSelectElement;
+
+    await act(async () => {
+      preset.value = "allTime";
+      preset.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ from: undefined, to: undefined, datePreset: "allTime" }));
+  });
+
+  it("active les sessions entières par défaut et expose la bascule accessible", async () => {
+    const onChange = vi.fn();
+    const { container } = await renderFilterBar({}, onChange);
+    const checkbox = container.querySelector(".date-session-scope input") as HTMLInputElement;
+
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox.closest("label")?.textContent).toContain("Inclure les sessions entières");
+
+    await act(async () => checkbox.click());
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ includeWholeSessions: false }));
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it("ajuste la borne opposée quand une date personnalisée inverse la plage", async () => {
+    const onChange = vi.fn();
+    const start = startOfLocalDay("2026-01-08")!;
+    const end = endOfLocalDay("2026-01-09")!;
+    const { container } = await renderFilterBar({ from: start, to: end }, onChange);
+    const startInput = container.querySelector("#filter-start-date") as HTMLInputElement;
+
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(startInput, "2026-01-10");
+      startInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      from: startOfLocalDay("2026-01-10"),
+      to: endOfLocalDay("2026-01-10"),
+      datePreset: "custom",
+    }));
   });
 
   it("renders groups before projects and leaves groups unchecked by default", async () => {

@@ -14,7 +14,8 @@
 ## Architecture et points sensibles
 
 - L'application desktop est composée d'un renderer React/TypeScript (`src/`), d'Electron main/preload (`electron/`) et d'un backend .NET 10 (`src-dotnet/`). Les échanges backend utilisent JSON Lines sur stdin/stdout; le renderer accède aux fonctions desktop uniquement via l'API du preload et IPC.
-- La version actuelle prend en charge OpenCode seulement. La base `opencode.db` est ouverte en lecture seule : ne jamais la migrer, modifier ni utiliser la base réelle dans les tests.
+- La première version multi-agents prend en charge l'adaptateur OpenCode. `opencode.db` reste strictement en lecture seule ; l'adaptateur normalise ses données dans `$XDG_DATA_HOME/acm-agent-cost-monitor/agent-usage.sqlite`. Les lectures du renderer et de l'audit utilisent uniquement cette base interne.
+- Le schéma interne SQLite est versionné. Les imports mettent à jour les éléments présents sans effacer les éléments archivés absents de la source ; les sauvegardes SQLite se fusionnent par identifiants stables, sans supprimer les données existantes.
 - Les E2E navigateur utilisent des fixtures isolées (`e2e/fixtures/isolated-fixture.ts`); les scénarios Electron isolent aussi les chemins XDG. Toute modification des coûts ou de SQLite doit être vérifiée avec ces scénarios et une base fixture.
 - Les chemins de base et de configuration OpenCode suivent XDG (`$XDG_DATA_HOME` / `~/.local/share`, `$XDG_CONFIG_HOME` / `~/.config`) sur les trois OS. Ne pas remplacer cette résolution par les répertoires de données/config spécifiques à l'OS.
 - `opencode.jsonc` peut contenir commentaires et virgules finales. Respecter ce format lors de son parsing.

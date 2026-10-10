@@ -8,6 +8,9 @@ namespace OpencodeCostsViewer.Backend.Application;
 
 internal sealed class BackendRuntime : IDisposable
 {
+    private CancellationTokenSource? _apiPollingCancellation;
+    private Task? _apiPollingTask;
+
     public BackendRuntime(ProtocolWriter writer)
     {
         Watcher = new DatabaseWatcher(writer, ReportWatcherFailure);
@@ -15,6 +18,7 @@ internal sealed class BackendRuntime : IDisposable
         SettingsError = startup.Diagnostic;
         if (startup.Diagnostic is null && startup.Settings.Live)
         {
+            StartApiPolling();
             try
             {
                 var databasePath = SettingsService.ResolvePaths(startup.Settings).Db;
@@ -37,7 +41,59 @@ internal sealed class BackendRuntime : IDisposable
     }
     public bool LiveActive => Watcher.ActivePath is not null;
 
-    public void Dispose() => Watcher.Dispose();
+    public bool ApiPollingActive => _apiPollingTask is { IsCompleted: false };
+
+    public void StartApiPolling()
+    {
+        if (ApiPollingActive) return;
+        _apiPollingCancellation?.Dispose();
+        _apiPollingCancellation = new CancellationTokenSource();
+        _apiPollingTask = PollOpenCodeApiAsync(_apiPollingCancellation.Token);
+    }
+
+    public void StopApiPolling()
+    {
+        _apiPollingCancellation?.Cancel();
+        _apiPollingTask = null;
+        _apiPollingCancellation?.Dispose();
+        _apiPollingCancellation = null;
+    }
+
+    public void Dispose()
+    {
+        StopApiPolling();
+        Watcher.Dispose();
+    }
+
+    private static async Task PollOpenCodeApiAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await UsageImportService.SyncOpenCodeApiAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (BackendException exception)
+            {
+                // L’échec de l’API reste isolé du watcher de la base.
+                Serilog.Log.Warning(exception, "OpenCode API polling failed");
+            }
+
+            try
+            {
+                if (!await timer.WaitForNextTickAsync(cancellationToken)) return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+    }
 
     private void ReportWatcherFailure(string message) =>
         WatcherError = new AppError("watcher", message);

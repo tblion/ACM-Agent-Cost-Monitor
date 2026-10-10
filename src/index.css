@@ -1,5 +1,6 @@
 /* Defines global layout, theme, and platform-specific styles. */
 :root {
+  color-scheme: light;
   --bg: #f5f6f8; --panel: #ffffff; --border: #e3e6ea;
   --text: #1a1d21; --muted: #6b7280; --text-subtle: #4b5563;
   --control-text: #1a1d21; --control-bg: #ffffff; --control-border: #9ca3af; --disabled-text: #6b7280;
@@ -8,6 +9,7 @@
 }
 html { overflow-x: hidden; }
 :root.dark {
+  color-scheme: dark;
   --bg: #0f1117; --panel: #161a23; --border: #262c3a;
   --text: #e5e7eb; --muted: #9ca3af; --text-subtle: #cbd5e1;
   --control-text: #f3f4f6; --control-bg: #1f2937; --control-border: #64748b; --disabled-text: #cbd5e1;
@@ -120,6 +122,23 @@ button:disabled, input:disabled, select:disabled {
 .header-runtime-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .header-runtime-item strong { color: var(--text); font-weight: 650; white-space: nowrap; }
 .header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.header-source-control { position: relative; flex: 0 0 auto; }
+.header-source-button { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); color: var(--text); cursor: pointer; }
+.header-source-button:hover { border-color: var(--accent); }
+.header-source-button:focus-visible, .header-source-refresh:focus-visible, .header-source-error:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.header-source-popover { position: absolute; z-index: 60; top: calc(100% + 8px); right: 0; width: min(440px, calc(100vw - 24px)); max-height: min(70vh, 520px); overflow: auto; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 12px 32px rgb(0 0 0 / 18%); }
+.header-source-popover h2 { margin: 0 0 10px; font-size: 14px; }
+.header-source-popover > p { margin: 8px 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.header-source-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+.header-source-details { display: grid; min-width: 0; gap: 3px; font-size: 11px; color: var(--muted); }
+.header-source-details strong { color: var(--text); font-size: 12px; }
+.header-source-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-source-refresh { min-height: 32px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 11px; cursor: pointer; }
+.header-source-refresh:disabled { cursor: wait; opacity: .7; }
+.header-source-error { color: var(--error); font-size: 17px; cursor: help; }
+.date-session-scope { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; color: var(--text); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.date-session-scope input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.date-session-scope:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .header-updated { max-width: 190px; color: var(--text-subtle); font-size: 11px; line-height: 1.3; }
 .status-bar {
   --status-text: var(--text-subtle);

@@ -1,11 +1,12 @@
 // Filters sessions and computes dashboard aggregates from usage records.
-import type { CostSource, SessionRecord, Tokens, CustomGroup } from "../types";
+import type { CostSource, MessageUsage, ModelUsage, SessionRecord, Tokens, CustomGroup } from "../types";
 
 // projects/models/providers:
 //   undefined = no filter (everything passes)
 //   []        = nothing selected -> nothing passes
 //   [...]     = union filter over these elements
-export interface Filters { projects?: string[]; models?: string[]; providers?: string[]; from?: number; to?: number; }
+export type DatePreset = "today" | "yesterday" | "last7Days" | "thisWeek" | "last30Days" | "thisMonth" | "lastMonth" | "thisYear" | "custom" | "allTime";
+export interface Filters { projects?: string[]; models?: string[]; providers?: string[]; from?: number; to?: number; datePreset?: DatePreset; includeWholeSessions?: boolean; }
 export interface KV { key: string; value: number; }
 
 export const MAX_PERIOD_DAYS = 3650;
@@ -42,16 +43,131 @@ export function formatLocalDate(timestamp: number): string {
   return `${year}-${month}-${day}`;
 }
 
+export function dateRangeForPreset(preset: Exclude<DatePreset, "custom">, referenceTime = Date.now()): Pick<Filters, "from" | "to"> {
+  const today = new Date(referenceTime);
+  today.setHours(0, 0, 0, 0);
+  const dayRange = (start: Date, end: Date) => ({
+    from: startOfLocalDay(formatLocalDate(start.getTime())),
+    to: endOfLocalDay(formatLocalDate(end.getTime())),
+  });
+
+  switch (preset) {
+    case "today":
+      return dayRange(today, today);
+    case "yesterday": {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return dayRange(yesterday, yesterday);
+    }
+    case "last7Days":
+    case "last30Days": {
+      const start = new Date(today);
+      start.setDate(start.getDate() - (preset === "last7Days" ? 6 : 29));
+      return dayRange(start, today);
+    }
+    case "thisWeek": {
+      const start = new Date(today);
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return dayRange(start, end);
+    }
+    case "thisMonth": {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return dayRange(start, end);
+    }
+    case "lastMonth": {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      return dayRange(start, end);
+    }
+    case "thisYear":
+      return dayRange(new Date(today.getFullYear(), 0, 1), new Date(today.getFullYear(), 11, 31));
+    case "allTime":
+      return { from: undefined, to: undefined };
+  }
+}
+
 export function filterSessions(data: SessionRecord[], f: Filters): SessionRecord[] {
   const projects = f.projects === undefined ? undefined : new Set(f.projects);
-  return data.filter(s => {
-    if (projects !== undefined && !projects.has(s.project)) return false;
-    if (f.from !== undefined && s.date < f.from) return false;
-    if (f.to !== undefined && s.date > f.to) return false;
-    if (f.models !== undefined && !s.models.some(m => f.models!.includes(m.model))) return false;
-    if (f.providers !== undefined && !s.models.some(m => f.providers!.includes(m.provider))) return false;
-    return true;
+  const hasDateRange = f.from !== undefined || f.to !== undefined;
+  const includeWholeSessions = f.includeWholeSessions !== false;
+
+  return data.flatMap(session => {
+    if (projects !== undefined && !projects.has(session.project)) return [];
+    const messages = session.messages;
+    if (!messages?.length) {
+      if (f.from !== undefined && session.date < f.from) return [];
+      if (f.to !== undefined && session.date > f.to) return [];
+      if (f.models !== undefined && !session.models.some(model => f.models!.includes(model.model))) return [];
+      if (f.providers !== undefined && !session.models.some(model => f.providers!.includes(model.provider))) return [];
+      return [session];
+    }
+
+    const hasDatedMessages = messages.some(message => message.date !== null);
+    const sessionDateMatches = (f.from === undefined || session.date >= f.from)
+      && (f.to === undefined || session.date <= f.to);
+    const matchingDateMessages = !hasDateRange || !hasDatedMessages
+      ? (sessionDateMatches ? messages : [])
+      : messages.filter(message => message.date !== null
+        && (f.from === undefined || message.date >= f.from)
+        && (f.to === undefined || message.date <= f.to));
+    const matchesModelAndProvider = (message: MessageUsage) =>
+      (f.models === undefined || f.models.includes(message.model))
+      && (f.providers === undefined || f.providers.includes(message.provider));
+    const matchingMessages = matchingDateMessages.filter(matchesModelAndProvider);
+    if (matchingMessages.length === 0) return [];
+
+    const dimensionFilteredMessages = includeWholeSessions
+      ? messages.filter(matchesModelAndProvider)
+      : matchingMessages;
+    if (dimensionFilteredMessages.length === 0) return [];
+    if (includeWholeSessions && dimensionFilteredMessages.length === messages.length) return [session];
+    return [aggregateFilteredMessages(session, dimensionFilteredMessages)];
   });
+}
+
+function aggregateFilteredMessages(session: SessionRecord, messages: MessageUsage[]): SessionRecord {
+  const models = new Map<string, ModelUsage>();
+  let cost = 0;
+  let source: CostSource = "configured";
+  const tokens = createTokens();
+
+  for (const message of messages) {
+    cost += message.cost;
+    addTokens(tokens, message.tokens);
+    if (message.source === "stored") source = "stored";
+    const key = `${message.provider}\u0000${message.model}`;
+    const model = models.get(key);
+    if (model) {
+      model.cost += message.cost;
+      addTokens(model.tokens, message.tokens);
+      if (message.source === "stored") model.source = "stored";
+    } else {
+      models.set(key, {
+        provider: message.provider,
+        model: message.model,
+        cost: message.cost,
+        tokens: { ...message.tokens },
+        source: message.source,
+      });
+    }
+  }
+
+  return { ...session, cost, tokens, source, models: [...models.values()], messages };
+}
+
+function createTokens(): Tokens {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+}
+
+function addTokens(target: Tokens, value: Tokens): void {
+  target.input += value.input;
+  target.output += value.output;
+  target.cacheRead += value.cacheRead;
+  target.cacheWrite += value.cacheWrite;
+  target.reasoning += value.reasoning;
 }
 
 export function sumCost(data: SessionRecord[]): number {

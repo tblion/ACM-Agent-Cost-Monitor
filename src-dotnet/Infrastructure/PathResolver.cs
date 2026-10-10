@@ -50,6 +50,16 @@ internal static class PathResolver
         return Path.Combine(GetXdgBaseDirectory("XDG_CONFIG_HOME", ".config"), "opencode-costs-viewer");
     }
 
+    public static string InternalDatabasePath() => Path.Combine(
+        GetXdgBaseDirectory("XDG_DATA_HOME", ".local", "share"),
+        "acm-agent-cost-monitor",
+        "agent-usage.sqlite");
+
+    public static string OpenCodeServiceStatePath() => Path.Combine(
+        GetXdgBaseDirectory("XDG_STATE_HOME", ".local", "state"),
+        "opencode",
+        "service.json");
+
     private static string GetXdgBaseDirectory(string variable, params string[] fallbackParts)
     {
         var configured = Environment.GetEnvironmentVariable(variable);

@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
-import type { ApiError } from "../src/types";
+import type { ApiError, BackendLogEntry } from "../src/types";
 import { BACKEND_PROTOCOL_VERSION } from "./protocol";
 import type { BackendEvent, BackendRequest, BackendResponse } from "./protocol";
 
@@ -17,19 +17,26 @@ interface BackendProcessOptions {
   workingDirectory: string;
   settingsDirectory: string;
   onEvent(event: BackendEvent): void;
+  onLog(entry: BackendLogEntry): void;
   onFailure(error: ApiError): void;
 }
 
 export class BackendProcess {
   private static readonly maximumStderrCharacters = 64 * 1024;
+  private static readonly maximumBackendLogEntries = 2000;
   private child: ChildProcessWithoutNullStreams | null = null;
   private readonly pending = new Map<string, PendingRequest>();
   private exited: Promise<void> = Promise.resolve();
   private resolveExited: (() => void) | undefined;
   private stderrTail = "";
+  private backendLogs: BackendLogEntry[] = [];
   private stopping = false;
 
   constructor(private readonly options: BackendProcessOptions) {}
+
+  getBackendLogs(): BackendLogEntry[] {
+    return [...this.backendLogs];
+  }
 
   async start(): Promise<void> {
     if (this.child) return;
@@ -46,6 +53,7 @@ export class BackendProcess {
     this.child = child;
     this.stopping = false;
     this.stderrTail = "";
+    this.backendLogs = [];
     this.exited = new Promise<void>((resolve) => {
       this.resolveExited = resolve;
     });
@@ -146,6 +154,10 @@ export class BackendProcess {
     if ("event" in message) {
       if (message.event === "db-changed" && message.payload === null) {
         this.options.onEvent(message);
+      } else if (message.event === "backend-log" && isBackendLogEntry(message.payload)) {
+        this.backendLogs.push(message.payload);
+        if (this.backendLogs.length > BackendProcess.maximumBackendLogEntries) this.backendLogs.shift();
+        this.options.onLog(message.payload);
       }
       return;
     }
@@ -177,6 +189,14 @@ export class BackendProcess {
     for (const request of this.pending.values()) request.reject(error);
     this.pending.clear();
   }
+}
+
+function isBackendLogEntry(value: unknown): value is BackendLogEntry {
+  return typeof value === "object" && value !== null
+    && typeof (value as BackendLogEntry).timestamp === "string"
+    && typeof (value as BackendLogEntry).level === "string"
+    && typeof (value as BackendLogEntry).message === "string"
+    && ((value as BackendLogEntry).exception === null || typeof (value as BackendLogEntry).exception === "string");
 }
 
 async function waitForExit(exited: Promise<void>, timeoutMilliseconds: number): Promise<void> {

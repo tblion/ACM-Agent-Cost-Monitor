@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { BackendProcess } from "./backend-process";
 import { IPC_CHANNELS } from "./ipc-contract";
 import type { IpcResult } from "./ipc-contract";
-import type { ApiError } from "../src/types";
+import type { ApiError, BackendLogEntry } from "../src/types";
 
 const applicationName = "ACM Agent Cost Monitor";
 const legacyApplicationIdentifier = "com.fcpb6403.opencode-costs-viewer";
@@ -19,6 +19,10 @@ const backendOperations = new Set([
   "get_runtime_metrics",
   "save_settings",
   "get_resolved_paths",
+  "get_internal_store_status",
+  "get_internal_store_sources",
+  "refresh_internal_store_source",
+  "refresh_opencode_api",
   "get_rates",
   "get_catalog_status",
   "recalculate_data",
@@ -57,6 +61,9 @@ const backend = new BackendProcess({
       mainWindow?.webContents.send(IPC_CHANNELS.databaseChanged, message.payload);
     }
   },
+  onLog: (entry: BackendLogEntry) => {
+    mainWindow?.webContents.send(IPC_CHANNELS.backendLog, entry);
+  },
   onFailure: (error) => {
     startupFailure = error;
     mainWindow?.webContents.send(IPC_CHANNELS.backendFailed, error);
@@ -75,6 +82,11 @@ ipcMain.handle(IPC_CHANNELS.invokeBackend, async (event, operation: unknown, arg
     return failure({ code: "invalid_input", message: "Backend operation arguments must be an object." });
   }
   return asIpcResult(() => backend.request(operation, (args as Record<string, unknown> | undefined) ?? {}));
+});
+
+ipcMain.handle(IPC_CHANNELS.getBackendLogs, (event) => {
+  if (!isTrustedSender(event)) return failure({ code: "invalid_input", message: "Untrusted IPC sender." });
+  return { success: true, value: backend.getBackendLogs() } satisfies IpcResult<BackendLogEntry[]>;
 });
 
 ipcMain.handle(IPC_CHANNELS.pickPath, async (event) => {
@@ -122,6 +134,37 @@ ipcMain.handle(IPC_CHANNELS.exportAuditReport, async (event, input: unknown) => 
     }
     return result.filePath;
   }, "export");
+});
+
+ipcMain.handle(IPC_CHANNELS.exportInternalStore, async (event) => {
+  if (!isTrustedSender(event)) return failure({ code: "invalid_input", message: "Untrusted IPC sender." });
+  return asIpcResult(async () => {
+    const options = {
+      defaultPath: "agent-usage.sqlite",
+      filters: [{ name: "SQLite", extensions: ["sqlite", "db"] }],
+    };
+    const result = mainWindow
+      ? await dialog.showSaveDialog(mainWindow, options)
+      : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return null;
+    await backend.request("export_internal_store", { path: result.filePath });
+    return result.filePath;
+  }, "database");
+});
+
+ipcMain.handle(IPC_CHANNELS.mergeInternalStore, async (event) => {
+  if (!isTrustedSender(event)) return failure({ code: "invalid_input", message: "Untrusted IPC sender." });
+  return asIpcResult(async () => {
+    const options: OpenDialogOptions = {
+      properties: ["openFile"],
+      filters: [{ name: "SQLite", extensions: ["sqlite", "db"] }],
+    };
+    const result = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options);
+    if (result.canceled || !result.filePaths[0]) return null;
+    return backend.request("merge_internal_store", { path: result.filePaths[0] });
+  }, "database");
 });
 
 ipcMain.handle(IPC_CHANNELS.openExternalUrl, async (event, input: unknown) => {

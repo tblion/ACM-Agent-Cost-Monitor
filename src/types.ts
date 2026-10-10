@@ -4,10 +4,11 @@ import type { SupportedLanguage } from "./i18n/locale";
 export interface Tokens { input: number; output: number; cacheRead: number; cacheWrite: number; reasoning: number; }
 export type CostSource = "configured" | "stored";
 export interface ModelUsage { provider: string; model: string; cost: number; tokens: Tokens; source: CostSource; }
+export interface MessageUsage { date: number | null; provider: string; model: string; cost: number; tokens: Tokens; source: CostSource; }
 export interface SessionRecord {
   id: string; project: string; title: string; date: number; cost: number;
   tokens: Tokens; isSubagent: boolean; parentId: string | null;
-  source: CostSource; models: ModelUsage[];
+  source: CostSource; models: ModelUsage[]; messages?: MessageUsage[];
 }
 export interface CustomGroup { name: string; projects: string[]; }
 export interface Settings {
@@ -16,8 +17,28 @@ export interface Settings {
   defaultPeriodDays: number; customGroups: CustomGroup[];
 }
 export interface ApiError { code: string; message: string; }
+export interface BackendLogEntry { timestamp: string; level: string; message: string; exception: string | null; }
 export interface SettingsResponse { settings: Settings; diagnostic: ApiError | null; liveActive: boolean; }
 export interface ResolvedPaths { db: string; config: string; }
+export interface InternalStoreStatus {
+  databasePath: string;
+  projects: number;
+  sessions: number;
+  messages: number;
+  sources: number;
+  lastImportedAt: string | null;
+  lastSyncError: string | null;
+}
+export interface InternalStoreSource {
+  sourceId: string;
+  agentName: string;
+  sourcePath: string;
+  lastImportedAt: string | null;
+  lastSyncAttemptAt: string;
+  lastSyncError: string | null;
+  channelKey: "database" | "api" | string;
+}
+export interface InternalStoreMergeResult { projectsAdded: number; sessionsAdded: number; messagesAdded: number; }
 export interface RuntimeMetrics {
   databaseSizeBytes: number | null;
   processMemoryBytes: number | null;

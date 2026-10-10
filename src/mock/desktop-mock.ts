@@ -129,6 +129,37 @@ export async function invoke<T>(cmd: string, args?: unknown): Promise<T> {
     }
     case "pick_path": return null as unknown as T;
     case "get_resolved_paths": return resolvedPaths as unknown as T;
+    case "get_internal_store_status": return {
+      databasePath: "/demo/acm-agent-cost-monitor/agent-usage.sqlite",
+      projects: getE2eSnapshot().sessions.length > 0 ? 1 : 0,
+      sessions: getE2eSnapshot().sessions.length,
+      messages: getE2eSnapshot().sessions.length,
+      sources: 1,
+      lastImportedAt: "2026-10-09T12:00:00.000Z",
+      lastSyncError: null,
+    } as unknown as T;
+    case "get_internal_store_sources": return [{
+      sourceId: "demo-opencode-source",
+      agentName: "OpenCode",
+      sourcePath: "/demo/opencode.db",
+      lastImportedAt: "2026-10-09T12:00:00.000Z",
+      lastSyncAttemptAt: "2026-10-09T12:00:00.000Z",
+      lastSyncError: null,
+      channelKey: "database",
+    }, {
+      sourceId: "demo-opencode-source",
+      agentName: "OpenCode",
+      sourcePath: "/demo/opencode-service.json",
+      lastImportedAt: null,
+      lastSyncAttemptAt: "2026-10-09T12:00:00.000Z",
+      lastSyncError: null,
+      channelKey: "api",
+    }] as unknown as T;
+    case "refresh_internal_store_source": return undefined as T;
+    case "refresh_opencode_api": return undefined as T;
+    case "export_internal_store": return "synthetic://agent-usage.sqlite" as unknown as T;
+    case "merge_internal_store": return { projectsAdded: 0, sessionsAdded: 0, messagesAdded: 0 } as unknown as T;
+    case "get_backend_logs": return [] as unknown as T;
     case "get_data": return getE2eSnapshot().sessions as unknown as T;
     case "get_rates": return getE2eSnapshot().rates as unknown as T;
     case "get_cost_summary": return getE2eSnapshot().costSummary as unknown as T;

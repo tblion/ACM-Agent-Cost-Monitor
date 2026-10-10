@@ -2,7 +2,7 @@
 import type { DesktopApi } from "../electron/renderer-api";
 import { invoke as invokeMock, listen as listenMock } from "./mock/desktop-mock";
 import type {
-  ApiError, AuditReport, CatalogStatus, CostSummary, RateEntry, RecalculationResult,
+  ApiError, AuditReport, BackendLogEntry, CatalogStatus, CostSummary, InternalStoreMergeResult, InternalStoreSource, InternalStoreStatus, RateEntry, RecalculationResult,
   ResolvedPaths, RuntimeMetrics, SessionRecord, Settings, SettingsResponse,
 } from "./types";
 
@@ -14,6 +14,13 @@ export interface ApiCommandMap {
   save_settings: void;
   pick_path: string | null;
   get_resolved_paths: ResolvedPaths;
+  get_internal_store_status: InternalStoreStatus;
+  get_internal_store_sources: InternalStoreSource[];
+  refresh_internal_store_source: void;
+  refresh_opencode_api: void;
+  export_internal_store: string | null;
+  merge_internal_store: InternalStoreMergeResult | null;
+  get_backend_logs: BackendLogEntry[];
   get_rates: RateEntry[];
   get_cost_summary: CostSummary[];
   get_catalog_status: CatalogStatus;
@@ -30,6 +37,13 @@ export interface ApiCommandArgs {
   save_settings: { s: Settings };
   pick_path: undefined;
   get_resolved_paths: undefined;
+  get_internal_store_status: undefined;
+  get_internal_store_sources: undefined;
+  refresh_internal_store_source: { sourceId: string };
+  refresh_opencode_api: undefined;
+  export_internal_store: undefined;
+  merge_internal_store: undefined;
+  get_backend_logs: undefined;
   get_rates: undefined;
   get_cost_summary: undefined;
   get_catalog_status: undefined;
@@ -41,7 +55,7 @@ export interface ApiCommandArgs {
 export type ApiCommandArguments<K extends keyof ApiCommandArgs> =
   ApiCommandArgs[K] extends undefined ? [] : [args: ApiCommandArgs[K]];
 
-const knownApiErrorCodes = new Set(["database", "configuration", "settings", "pricing", "watcher", "export", "invalid_input"]);
+const knownApiErrorCodes = new Set(["database", "configuration", "settings", "pricing", "watcher", "integration", "export", "invalid_input"]);
 
 export function isApiError(value: unknown): value is ApiError {
   return typeof value === "object" && value !== null
@@ -95,6 +109,17 @@ export const onDbChanged = (callback: () => void): Promise<() => void> => {
   return Promise.resolve(getDesktopApi().onDatabaseChanged(callback));
 };
 export const getResolvedPaths = () => invokeCommand("get_resolved_paths");
+export const getInternalStoreStatus = () => invokeCommand("get_internal_store_status");
+export const getInternalStoreSources = () => invokeCommand("get_internal_store_sources");
+export const refreshInternalStoreSource = (sourceId: string) => invokeCommand("refresh_internal_store_source", { sourceId });
+export const refreshOpenCodeApi = () => invokeCommand("refresh_opencode_api");
+export const exportInternalStore = () => invokeCommand("export_internal_store");
+export const mergeInternalStore = () => invokeCommand("merge_internal_store");
+export const getBackendLogs = () => invokeCommand("get_backend_logs");
+export const onBackendLog = (callback: (entry: BackendLogEntry) => void): (() => void) => {
+  if (import.meta.env.VITE_OPENCODE_MOCK === "true") return () => {};
+  return getDesktopApi().onBackendLog(callback);
+};
 export const getRates = () => invokeCommand("get_rates");
 export const getCostSummary = () => invokeCommand("get_cost_summary");
 export const getCatalogStatus = () => invokeCommand("get_catalog_status");
@@ -121,6 +146,13 @@ function invokeDesktopApi(
     case "save_settings": return api.saveSettings((args as ApiCommandArgs["save_settings"]).s);
     case "pick_path": return api.pickPath();
     case "get_resolved_paths": return api.getResolvedPaths();
+    case "get_internal_store_status": return api.getInternalStoreStatus();
+    case "get_internal_store_sources": return api.getInternalStoreSources();
+    case "refresh_internal_store_source": return api.refreshInternalStoreSource((args as ApiCommandArgs["refresh_internal_store_source"]).sourceId);
+    case "refresh_opencode_api": return api.refreshOpenCodeApi();
+    case "export_internal_store": return api.exportInternalStore();
+    case "merge_internal_store": return api.mergeInternalStore();
+    case "get_backend_logs": return api.getBackendLogs();
     case "get_rates": return api.getRates();
     case "get_cost_summary": return api.getCostSummary();
     case "get_catalog_status": return api.getCatalogStatus();

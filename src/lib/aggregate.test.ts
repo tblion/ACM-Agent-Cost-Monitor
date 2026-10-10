@@ -1,8 +1,8 @@
 // Tests date boundaries, session filtering, and usage aggregation helpers.
 import { describe, it, expect } from "vitest";
-import { endOfLocalDay, filterSessions, formatLocalDate, startOfLocalDay, sumCost, costBySource, byProject, byProjectSelection, isProjectGroupKey, projectSelectionLabel, byModel, byProvider, tokenTotals, topSessions, byGroup, usageByBillingType } from "./aggregate";
+import { dateRangeForPreset, endOfLocalDay, filterSessions, formatLocalDate, startOfLocalDay, sumCost, costBySource, byProject, byProjectSelection, isProjectGroupKey, projectSelectionLabel, byModel, byProvider, tokenTotals, topSessions, byGroup, usageByBillingType } from "./aggregate";
 import { buildProjectFilterOptions, resolveProjectSelection } from "./projectFilters";
-import type { SessionRecord } from "../types";
+import type { MessageUsage, SessionRecord } from "../types";
 
 const S = (o: Partial<SessionRecord>): SessionRecord => ({
   id: "s", project: "C:/git/a", title: "t", date: 1700000000000, cost: 0,
@@ -16,6 +16,47 @@ describe("filterSessions", () => {
       expect(startOfLocalDay(value)).toBeUndefined();
       expect(endOfLocalDay(value)).toBeUndefined();
     }
+  });
+
+  it("calcule les périodes calendaires complètes en heure locale", () => {
+    const reference = new Date(2026, 9, 9, 12).getTime();
+    expect(dateRangeForPreset("thisWeek", reference)).toEqual({
+      from: startOfLocalDay("2026-10-05"),
+      to: endOfLocalDay("2026-10-11"),
+    });
+    expect(dateRangeForPreset("thisMonth", reference)).toEqual({
+      from: startOfLocalDay("2026-10-01"),
+      to: endOfLocalDay("2026-10-31"),
+    });
+    expect(dateRangeForPreset("lastMonth", reference)).toEqual({
+      from: startOfLocalDay("2026-09-01"),
+      to: endOfLocalDay("2026-09-30"),
+    });
+    expect(dateRangeForPreset("thisYear", reference)).toEqual({
+      from: startOfLocalDay("2026-01-01"),
+      to: endOfLocalDay("2026-12-31"),
+    });
+  });
+
+  it("calcule les périodes glissantes en incluant aujourd'hui", () => {
+    const reference = new Date(2026, 9, 9, 12).getTime();
+    expect(dateRangeForPreset("last7Days", reference)).toEqual({
+      from: startOfLocalDay("2026-10-03"),
+      to: endOfLocalDay("2026-10-09"),
+    });
+    expect(dateRangeForPreset("last30Days", reference)).toEqual({
+      from: startOfLocalDay("2026-09-10"),
+      to: endOfLocalDay("2026-10-09"),
+    });
+    expect(dateRangeForPreset("allTime", reference)).toEqual({ from: undefined, to: undefined });
+  });
+
+  it("gère les mois bissextiles dans les préréglages", () => {
+    const reference = new Date(2024, 1, 15, 12).getTime();
+    expect(dateRangeForPreset("thisMonth", reference)).toEqual({
+      from: startOfLocalDay("2024-02-01"),
+      to: endOfLocalDay("2024-02-29"),
+    });
   });
 
   it("ne formate pas une valeur temporelle non finie", () => {
@@ -90,6 +131,51 @@ describe("filterSessions", () => {
     ];
 
     expect(filterSessions(data, { from: 0 }).map(s => s.id)).toEqual(["epoch", "after"]);
+  });
+
+  it("inclut toute la session par défaut dès qu'un de ses messages tombe dans la période", () => {
+    const session = S({
+      id: "multi-day",
+      date: 100,
+      cost: 12,
+      tokens: { input: 12, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 },
+      models: [{ provider: "p", model: "m", cost: 12, source: "configured", tokens: { input: 12, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } }],
+      messages: [
+        { date: 100, provider: "p", model: "m", cost: 5, source: "configured", tokens: { input: 5, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } },
+        { date: 300, provider: "p", model: "m", cost: 7, source: "configured", tokens: { input: 7, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } },
+      ],
+    });
+
+    const filtered = filterSessions([session], { from: 250, to: 350 });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].cost).toBe(12);
+  });
+
+  it("ne compte que les messages de la période lorsque l'option session entière est décochée", () => {
+    const firstMessage: MessageUsage = { date: 100, provider: "p", model: "m", cost: 5, source: "configured", tokens: { input: 5, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
+    const secondMessage: MessageUsage = { date: 300, provider: "p", model: "m", cost: 7, source: "configured", tokens: { input: 7, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
+    const session = S({
+      id: "multi-day",
+      date: 100,
+      cost: 12,
+      models: [{ provider: "p", model: "m", cost: 12, source: "configured", tokens: { input: 12, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } }],
+      messages: [firstMessage, secondMessage],
+    });
+
+    const filtered = filterSessions([session], { from: 250, to: 350, includeWholeSessions: false });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].cost).toBe(7);
+    expect(filtered[0].tokens.input).toBe(7);
+    expect(filtered[0].models).toEqual([{ provider: "p", model: "m", cost: 7, source: "configured", tokens: { input: 7, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } }]);
+    expect(filtered[0].messages).toEqual([secondMessage]);
+  });
+
+  it("exclut une session dont aucun message ne tombe dans la période", () => {
+    const session = S({
+      date: 100,
+      messages: [{ date: 100, provider: "p", model: "m", cost: 1, source: "configured", tokens: { input: 1, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 } }],
+    });
+    expect(filterSessions([session], { from: 200, to: 300 })).toEqual([]);
   });
 });
 
