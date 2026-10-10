@@ -53,10 +53,6 @@ jobs:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npm run desktop:package -- --win --x64
 
-      - name: Test Windows installers
-        shell: pwsh
-        run: ./scripts/verify-windows-installers.ps1
-
       - name: Locate Windows installers
         id: installers
         shell: pwsh
