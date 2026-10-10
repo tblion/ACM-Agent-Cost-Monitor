@@ -159,8 +159,11 @@ $remainingShortcuts = @(Get-ProductShortcuts)
 if ($remainingShortcuts.Count -ne 0) {
     $paths = ($remainingShortcuts | ForEach-Object { $_.FullName }) -join ", "
     Write-Host "Cleaning up Start Menu shortcut(s) left by the NSIS uninstaller: $paths"
-    $remainingShortcuts | Remove-Item -Force
+    foreach ($shortcut in $remainingShortcuts) {
+        Remove-Item -LiteralPath $shortcut.FullName -Force -ErrorAction SilentlyContinue
+    }
 }
+if ((Get-ProductShortcuts).Count -ne 0) { throw "NSIS uninstall left a Start Menu shortcut." }
 if (-not (Test-Path $settingsMarker)) { throw "NSIS uninstall removed application settings." }
 
 $msiInstallLog = Join-Path $env:RUNNER_TEMP "acm-agent-cost-monitor-msi-install.log"
