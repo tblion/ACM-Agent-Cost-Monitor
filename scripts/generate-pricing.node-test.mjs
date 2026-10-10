@@ -102,6 +102,20 @@ test("recognizes the default unqualified macOS Intel DMG alongside Apple Silicon
   ]), false);
 });
 
+test("selects versioned release installers without matching bundled Windows executables", async () => {
+  const publicationModule = await import("./release-publication.mjs");
+  const isInstaller = publicationModule.isVersionedReleaseInstaller;
+
+  assert.equal(isInstaller("ACM Agent Cost Monitor Setup 1.1.0.exe", "1.1.0"), true);
+  assert.equal(isInstaller("ACM Agent Cost Monitor 1.1.0.msi", "1.1.0"), true);
+  assert.equal(isInstaller("ACM Agent Cost Monitor-1.1.0-arm64.dmg", "1.1.0"), true);
+  assert.equal(isInstaller("acm-agent-cost-monitor_1.1.0_amd64.deb", "1.1.0"), true);
+  assert.equal(isInstaller("ACM Agent Cost Monitor.exe", "1.1.0"), false);
+  assert.equal(isInstaller("OpencodeCostsViewer.Backend.exe", "1.1.0"), false);
+  assert.equal(isInstaller("elevate.exe", "1.1.0"), false);
+  assert.equal(isInstaller("ACM Agent Cost Monitor Setup 1.0.0.exe", "1.1.0"), false);
+});
+
 test("skips executable-named documentation directories when resolving packaged binaries", async () => {
   const executableModule = await import("./find-executable.mjs").catch(() => ({}));
   assert.equal(typeof executableModule.findExecutable, "function");

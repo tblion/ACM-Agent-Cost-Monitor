@@ -1,4 +1,6 @@
 // Builds the GitHub CLI arguments for publishing a tagged release.
+import path from "node:path";
+
 export function createReleaseArguments(tag, installers, repository) {
   const argumentsList = [
     "release",
@@ -13,6 +15,11 @@ export function createReleaseArguments(tag, installers, repository) {
   ];
   if (/^v\d+\.\d+\.\d+-/.test(tag)) argumentsList.push("--prerelease");
   return argumentsList;
+}
+
+export function isVersionedReleaseInstaller(fileName, version) {
+  return [".exe", ".msi", ".dmg", ".deb"].includes(path.extname(fileName).toLowerCase())
+    && path.basename(fileName).includes(version);
 }
 
 export function hasValidMacDmgArchitectures(dmgNames) {
