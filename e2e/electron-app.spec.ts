@@ -468,7 +468,11 @@ test("exports and merges the internal SQLite archive without duplicating records
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [backup] });
   }, backupPath);
 
-  await expect(page!.evaluate(async () => window.desktopApi!.exportInternalStore())).resolves.toBe(backupPath);
+  const exportResult = await page!.evaluate(async () => window.desktopApi!.exportInternalStore().then(
+    value => ({ value }),
+    error => ({ error: JSON.stringify(error) }),
+  ));
+  expect(exportResult, `Internal store export result: ${JSON.stringify(exportResult)}`).toEqual({ value: backupPath });
   await expect(readFile(backupPath)).resolves.toBeTruthy();
   await expect(page!.evaluate(async () => window.desktopApi!.mergeInternalStore())).resolves.toMatchObject({
     projectsAdded: 0,
