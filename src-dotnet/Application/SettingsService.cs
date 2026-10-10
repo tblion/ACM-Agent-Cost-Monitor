@@ -110,10 +110,12 @@ internal static class SettingsService
                         throw new IOException(
                             runtime.WatcherError?.Message ?? "Database watcher did not remain active after startup.");
                     }
+                    runtime.StartApiPolling();
                 }
                 else
                 {
                     runtime.Watcher.Stop();
+                    runtime.StopApiPolling();
                 }
             }
             catch (Exception watcherException) when (BackendRuntime.IsWatcherFailure(watcherException))
@@ -130,8 +132,16 @@ internal static class SettingsService
 
                 try
                 {
-                    if (previousWatcherPath is null) runtime.Watcher.Stop();
-                    else runtime.Watcher.StartOrRestart(previousWatcherPath);
+                    if (previousWatcherPath is null)
+                    {
+                        runtime.Watcher.Stop();
+                        runtime.StopApiPolling();
+                    }
+                    else
+                    {
+                        runtime.Watcher.StartOrRestart(previousWatcherPath);
+                        runtime.StartApiPolling();
+                    }
                 }
                 catch (Exception watcherRollbackException) when (BackendRuntime.IsWatcherFailure(watcherRollbackException))
                 {

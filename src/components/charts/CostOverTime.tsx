@@ -6,14 +6,22 @@ import { tooltipStyle, tooltipCursor } from "./chartTheme";
 import { useTranslation } from "react-i18next";
 import { formatCurrency, formatDate, formatNumber } from "../../i18n/format";
 import { resolveLanguage } from "../../i18n/locale";
+import { formatLocalDate } from "../../lib/aggregate";
 
 export function CostOverTime({ data }: { data: SessionRecord[] }) {
   const { t, i18n } = useTranslation();
   const language = resolveLanguage(i18n.language);
   const byDay = new Map<string, number>();
   for (const s of data) {
-    const d = new Date(s.date).toISOString().slice(0, 10);
-    byDay.set(d, (byDay.get(d) ?? 0) + s.cost);
+    if (s.messages?.length) {
+      for (const message of s.messages) {
+        const d = formatLocalDate(message.date ?? s.date);
+        byDay.set(d, (byDay.get(d) ?? 0) + message.cost);
+      }
+    } else {
+      const d = formatLocalDate(s.date);
+      byDay.set(d, (byDay.get(d) ?? 0) + s.cost);
+    }
   }
   const rows = [...byDay.entries()].map(([day, cost]) => ({ day, cost })).sort((a, b) => a.day.localeCompare(b.day));
   return (

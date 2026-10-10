@@ -3,6 +3,7 @@ using System.Text.Json;
 using OpencodeCostsViewer.Backend.Application;
 using OpencodeCostsViewer.Backend.Infrastructure;
 using OpencodeCostsViewer.Backend.Models;
+using Serilog;
 
 namespace OpencodeCostsViewer.Backend.Protocol;
 
@@ -15,12 +16,13 @@ internal sealed class OperationDispatcher : IDisposable
         _runtime = new BackendRuntime(writer);
     }
 
-    public ValueTask<object?> DispatchAsync(
+    public async ValueTask<object?> DispatchAsync(
         string operation,
         JsonElement arguments,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        Log.Information("Processing backend operation {Operation}", operation);
         try
         {
             object? result = operation switch
@@ -32,13 +34,19 @@ internal sealed class OperationDispatcher : IDisposable
                 "get_runtime_metrics" => GetRuntimeMetrics(arguments),
                 "save_settings" => SaveSettings(arguments),
                 "get_resolved_paths" => GetResolvedPaths(),
+                "get_internal_store_status" => InternalStoreService.GetStatus(),
+                "get_internal_store_sources" => InternalStoreService.GetSources(),
+                "refresh_internal_store_source" => RefreshInternalStoreSource(arguments),
+                "refresh_opencode_api" => await RefreshOpenCodeApi(cancellationToken),
+                "export_internal_store" => ExportInternalStore(arguments),
+                "merge_internal_store" => MergeInternalStore(arguments),
                 "get_rates" => GetRates(),
                 "get_catalog_status" => GetCatalogStatus(),
                 "recalculate_data" => RecalculateData(),
                 "get_audit_report" => GetAuditReport(),
                 _ => throw new ProtocolException("invalid_input", $"Unknown operation: {operation}"),
             };
-            return ValueTask.FromResult(result);
+            return result;
         }
         catch (BackendException exception)
         {
@@ -85,9 +93,8 @@ internal sealed class OperationDispatcher : IDisposable
             throw new ProtocolException("invalid_input", "includeDatabaseSize must be a boolean.");
         }
 
-        var settings = SettingsService.LoadForCommands();
         var databasePath = includeSize.GetBoolean()
-            ? SettingsService.ResolvePaths(settings).Db
+            ? InternalDatabase.DatabasePath
             : null;
         return RuntimeMetricsService.Collect(databasePath);
     }
@@ -120,6 +127,46 @@ internal sealed class OperationDispatcher : IDisposable
         var status = SettingsService.LoadForStatus();
         _runtime.SettingsError = status.Diagnostic;
         return SettingsService.ResolvePaths(status.Settings);
+    }
+
+    private object? ExportInternalStore(JsonElement arguments)
+    {
+        var paths = SettingsService.ResolvePaths(SettingsService.LoadForCommands());
+        InternalStoreService.Export(paths.Db, ReadPathArgument(arguments));
+        return null;
+    }
+
+    private InternalStoreMergeResult MergeInternalStore(JsonElement arguments) =>
+        InternalStoreService.Merge(ReadPathArgument(arguments));
+
+    private object? RefreshInternalStoreSource(JsonElement arguments)
+    {
+        if (!arguments.TryGetProperty("sourceId", out var sourceId)
+            || sourceId.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(sourceId.GetString()))
+        {
+            throw new ProtocolException("invalid_input", "A source id is required.");
+        }
+        var sourcePath = SettingsService.ResolvePaths(SettingsService.LoadForCommands()).Db;
+        UsageImportService.RefreshSource(sourceId.GetString()!, sourcePath);
+        return null;
+    }
+
+    private static async Task<object?> RefreshOpenCodeApi(CancellationToken cancellationToken)
+    {
+        await UsageImportService.SyncOpenCodeApiAsync(cancellationToken);
+        return null;
+    }
+
+    private static string ReadPathArgument(JsonElement arguments)
+    {
+        if (!arguments.TryGetProperty("path", out var path)
+            || path.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(path.GetString()))
+        {
+            throw new ProtocolException("invalid_input", "A non-empty database path is required.");
+        }
+        return path.GetString()!;
     }
 
     private IReadOnlyList<RateEntry> GetRates()

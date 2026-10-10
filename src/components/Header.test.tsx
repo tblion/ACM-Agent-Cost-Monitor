@@ -32,6 +32,7 @@ async function renderHeader(live: boolean, liveConfigured: boolean, onToggleLive
       onOpenRates: vi.fn(),
       onOpenAbout: vi.fn(),
       onOpenAudit: vi.fn(),
+      onSourceRefreshed: async () => {},
       auditButtonRef: { current: null },
       showAudit: false,
     })));

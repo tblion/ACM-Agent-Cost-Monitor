@@ -127,6 +127,7 @@ function snapshotFromDatabase(database) {
       parentId: null,
       source: "configured",
       models: [{ provider: "fixture", model: "fixture-model", cost: row.cost, tokens, source: "configured" }],
+      messages: [{ date: Date.parse(row.created_at), provider: "fixture", model: "fixture-model", cost: row.cost, tokens, source: "configured" }],
     };
   });
 }
@@ -136,6 +137,12 @@ const alternateSnapshot = { sessions: snapshotFromDatabase(alternateDatabase), r
 const boundary = primarySnapshot.sessions.find(session => session.id === "today" && session.title === "Boundary fixture session");
 const outside = primarySnapshot.sessions.find(session => session.id === "outside");
 if (!boundary || !outside) throw new Error("E2E SQL fixture is missing required sessions");
+const firstMessageTokens = Object.fromEntries(Object.entries(boundary.tokens).map(([key, value]) => [key, Math.floor(value / 2)]));
+const secondMessageTokens = Object.fromEntries(Object.entries(boundary.tokens).map(([key, value]) => [key, value - firstMessageTokens[key]]));
+boundary.messages = [
+  { date: boundary.date, provider: "fixture", model: "fixture-model", cost: boundary.cost / 2, tokens: firstMessageTokens, source: "configured" },
+  { date: boundary.date + 24 * 60 * 60 * 1000, provider: "fixture", model: "fixture-model", cost: boundary.cost - boundary.cost / 2, tokens: secondMessageTokens, source: "configured" },
+];
 await writeFile(primaryDatabasePath, Buffer.from(primaryDatabase.export()));
 await writeFile(alternateDatabasePath, Buffer.from(alternateDatabase.export()));
 await writeFile(snapshotPath, JSON.stringify(primarySnapshot, null, 2), "utf8");

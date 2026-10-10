@@ -10,6 +10,10 @@ export const IPC_CHANNELS = {
   pickPath: "native:pick-path",
   exportAuditReport: "native:export-audit-report",
   openExternalUrl: "native:open-external-url",
+  exportInternalStore: "native:export-internal-store",
+  mergeInternalStore: "native:merge-internal-store",
+  getBackendLogs: "backend:get-logs",
   databaseChanged: "backend:db-changed",
+  backendLog: "backend:log",
   backendFailed: "backend:failed",
 } as const;

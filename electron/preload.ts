@@ -1,7 +1,7 @@
 // Exposes the narrow, typed desktop API to the isolated renderer context.
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
-import type { ApiError } from "../src/types";
+import type { ApiError, BackendLogEntry, InternalStoreMergeResult } from "../src/types";
 import type { DesktopApi } from "./renderer-api";
 import type { IpcResult } from "./ipc-contract";
 import { IPC_CHANNELS } from "./ipc-contract";
@@ -31,6 +31,18 @@ const desktopApi: DesktopApi = {
     invokeBackend("get_runtime_metrics", { includeDatabaseSize }),
   saveSettings: (settings) => invokeBackend("save_settings", { s: settings }),
   getResolvedPaths: () => invokeBackend("get_resolved_paths"),
+  getInternalStoreStatus: () => invokeBackend("get_internal_store_status"),
+  getInternalStoreSources: () => invokeBackend("get_internal_store_sources"),
+  refreshInternalStoreSource: (sourceId) => invokeBackend("refresh_internal_store_source", { sourceId }),
+  refreshOpenCodeApi: () => invokeBackend("refresh_opencode_api"),
+  exportInternalStore: () => unwrap(ipcRenderer.invoke(IPC_CHANNELS.exportInternalStore) as Promise<IpcResult<string | null>>),
+  mergeInternalStore: () => unwrap(ipcRenderer.invoke(IPC_CHANNELS.mergeInternalStore) as Promise<IpcResult<InternalStoreMergeResult | null>>),
+  getBackendLogs: () => unwrap(ipcRenderer.invoke(IPC_CHANNELS.getBackendLogs) as Promise<IpcResult<BackendLogEntry[]>>),
+  onBackendLog: (callback) => {
+    const listener = (_event: IpcRendererEvent, entry: BackendLogEntry) => callback(entry);
+    ipcRenderer.on(IPC_CHANNELS.backendLog, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.backendLog, listener);
+  },
   getRates: () => invokeBackend("get_rates"),
   getCatalogStatus: () => invokeBackend("get_catalog_status"),
   recalculateData: () => invokeBackend("recalculate_data"),

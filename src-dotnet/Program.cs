@@ -1,6 +1,7 @@
 // Configures and starts the backend JSON Lines protocol host.
 using OpencodeCostsViewer.Backend.Infrastructure;
 using OpencodeCostsViewer.Backend.Protocol;
+using Serilog;
 
 if (args.Length > 0)
 {
@@ -40,9 +41,15 @@ try
 {
     SqliteProvider.Initialize();
     var writer = new ProtocolWriter();
+    Log.Logger = new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .WriteTo.Sink(new ProtocolLogSink(writer))
+        .CreateLogger();
+    Log.Information("Backend host started");
     using var dispatcher = new OperationDispatcher(writer);
     var host = new ProtocolHost(dispatcher, writer);
     await host.RunAsync();
+    await Log.CloseAndFlushAsync();
     return 0;
 }
 catch (OperationCanceledException)
@@ -51,6 +58,7 @@ catch (OperationCanceledException)
 }
 catch (Exception exception)
 {
-    await Console.Error.WriteLineAsync($"Backend terminated: {exception.Message}");
+    Log.Fatal(exception, "Backend terminated unexpectedly");
+    await Log.CloseAndFlushAsync();
     return 1;
 }

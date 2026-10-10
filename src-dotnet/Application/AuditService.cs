@@ -12,7 +12,8 @@ internal static class AuditService
         DatabaseAuditSnapshot snapshot;
         try
         {
-            snapshot = OpencodeDatabase.LoadAuditSnapshot(databasePath);
+            UsageImportService.SyncOpenCode(databasePath);
+            snapshot = InternalDatabase.LoadAuditSnapshot();
         }
         catch (SqliteException exception)
         {
@@ -57,7 +58,7 @@ internal static class AuditService
                 snapshot.TotalMessages,
                 catalog,
                 overrides,
-                new AuditPaths(databasePath, configPath, "embedded://pricing.json"));
+                new AuditPaths(InternalDatabase.DatabasePath, configPath, "embedded://pricing.json"));
         }
         catch (Exception exception) when (exception is InvalidDataException or OverflowException)
         {

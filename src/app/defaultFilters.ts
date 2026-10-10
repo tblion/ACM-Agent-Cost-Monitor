@@ -1,5 +1,5 @@
 // Builds the initial dashboard filters from usage data and configured period.
-import { endOfLocalDay, MAX_PERIOD_DAYS, startOfLocalDay, type Filters } from "../lib/aggregate";
+import { dateRangeForPreset, endOfLocalDay, MAX_PERIOD_DAYS, startOfLocalDay, type Filters } from "../lib/aggregate";
 import type { SessionRecord } from "../types";
 
 export function defaultFilters(sessions: SessionRecord[], defaultPeriodDays?: number | null): Filters {
@@ -14,5 +14,7 @@ export function defaultFilters(sessions: SessionRecord[], defaultPeriodDays?: nu
   today.setDate(today.getDate() - period + 1);
   const from = startOfLocalDay(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`);
   const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  return { from, to: endOfLocalDay(todayString) };
+  const datePreset = period === 7 ? "last7Days" : period === 30 ? "last30Days" : "custom";
+  if (datePreset !== "custom") return { ...dateRangeForPreset(datePreset, now.getTime()), datePreset };
+  return { from, to: endOfLocalDay(todayString), datePreset };
 }

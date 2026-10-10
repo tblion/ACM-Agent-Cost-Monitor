@@ -41,6 +41,16 @@ internal static class SessionAggregator
                 modelIndexes.Add(sessionKey, []);
             }
 
+            session.Messages.Add(new MessageUsage
+            {
+                Date = row.MessageDate,
+                Provider = row.Provider,
+                Model = row.Model,
+                Cost = cost,
+                Tokens = tokens,
+                Source = usedConfiguredRate ? CostSource.Configured : CostSource.Stored,
+            });
+
             session.Cost = AddFinite(session.Cost, cost);
             session.Tokens = session.Tokens.Add(tokens);
             if (!usedConfiguredRate)

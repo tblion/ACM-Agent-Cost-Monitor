@@ -22,24 +22,19 @@ internal static class DataService
 
     public static IReadOnlyList<CostSummary> ComputeCostSummary(string databasePath, string configPath)
     {
-        var rates = LoadRates(configPath);
-        try
-        {
-            return OpencodeDatabase.LoadCostSummary(databasePath)
-                .Select(summary => summary with
-                {
-                    Configured = rates.ContainsKey((summary.Provider, summary.Model)),
-                })
-                .ToArray();
-        }
-        catch (SqliteException exception)
-        {
-            throw new BackendException("database", $"Impossible de lire la base: {exception.Message}", exception);
-        }
-        catch (InvalidDataException exception)
-        {
-            throw new BackendException("database", exception.Message, exception);
-        }
+        var inputs = LoadInputs(databasePath, configPath);
+        return inputs.Rows
+            .Where(row => row.StoredCost > 0)
+            .GroupBy(row => (row.Provider, row.Model))
+            .OrderBy(group => group.Key.Provider, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.Model, StringComparer.Ordinal)
+            .Select(group => new CostSummary(
+                group.Key.Provider,
+                group.Key.Model,
+                checked((ulong)group.LongCount()),
+                group.Sum(row => row.StoredCost),
+                inputs.Rates.ContainsKey(group.Key)))
+            .ToArray();
     }
 
     public static RecalculationResult Recalculate(string databasePath, string configPath)
@@ -84,7 +79,8 @@ internal static class DataService
         List<UsageRow> rows;
         try
         {
-            rows = OpencodeDatabase.LoadUsageRows(databasePath);
+            UsageImportService.SyncOpenCode(databasePath);
+            rows = InternalDatabase.LoadUsageRows();
         }
         catch (SqliteException exception)
         {
