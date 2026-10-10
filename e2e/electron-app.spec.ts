@@ -521,6 +521,7 @@ async function createFixture(): Promise<ElectronFixture> {
       mkdir(configDirectory, { recursive: true }),
       mkdir(path.join(root, "settings"), { recursive: true }),
     ]);
+    await writeFile(path.join(root, "settings", "settings.json"), JSON.stringify({ language: "fr" }), "utf8");
 
     const sqlSource = await readFile(path.join(repositoryRoot, "e2e", "fixtures", "opencode-backend-fixture.sql"), "utf8");
     const configSource = await readFile(path.join(repositoryRoot, "e2e", "fixtures", "opencode-backend-config.jsonc"), "utf8");
