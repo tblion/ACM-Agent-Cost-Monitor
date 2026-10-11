@@ -42,6 +42,7 @@ test.beforeEach(async () => {
     await writeFile(path.join(settingsDirectory, "settings.json"), JSON.stringify({
       fixedSubscriptions: [{
         provider: "legacy-provider",
+        name: "Legacy plan",
         amount: 42,
         period: "monthly",
         models: ["legacy-model"],
@@ -353,6 +354,7 @@ test("loads legacy subscriptions and defaults versioned custom rates", async () 
   const settings = await page!.evaluate(async () => window.desktopApi!.getSettings());
   expect(settings.fixedSubscriptions).toEqual([expect.objectContaining({
     provider: "legacy-provider",
+    name: "Legacy plan",
     amount: 42,
     period: "monthly",
     models: ["legacy-model"],
@@ -367,6 +369,7 @@ test("loads legacy subscriptions and defaults versioned custom rates", async () 
   let saved = await page!.evaluate(async () => window.desktopApi!.getSettings());
   expect((saved.fixedSubscriptions[0] as typeof saved.fixedSubscriptions[number] & { id?: string }).id)
     .toBe(legacySubscriptionId);
+  expect(saved.fixedSubscriptions[0].name).toBe("Legacy plan");
 
   const customRate = {
     id: "legacy-model-rate-2026",

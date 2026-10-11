@@ -273,9 +273,11 @@ internal static class SettingsStore
                     foreach (var subscription in fixedSubscriptions.EnumerateArray())
                     {
                         if (subscription.ValueKind != JsonValueKind.Object
-                            || subscription.EnumerateObject().Any(property => property.Name is not ("id" or "provider" or "amount" or "period" or "models" or "effectiveFrom" or "effectiveTo"))
+                            || subscription.EnumerateObject().Any(property => property.Name is not ("id" or "provider" or "name" or "amount" or "period" or "models" or "effectiveFrom" or "effectiveTo"))
                             || (subscription.TryGetProperty("id", out var existingId)
                                 && (existingId.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(existingId.GetString())))
+                            || (subscription.TryGetProperty("name", out var name)
+                                && name.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
                             || !subscription.TryGetProperty("provider", out var provider)
                             || provider.ValueKind != JsonValueKind.String
                             || string.IsNullOrWhiteSpace(provider.GetString())
@@ -329,6 +331,10 @@ internal static class SettingsStore
                                     ? subscriptionId.GetString()!
                                     : Guid.NewGuid().ToString("N"),
                             Provider = provider.GetString()!,
+                            Name = subscription.TryGetProperty("name", out var subscriptionName)
+                                && subscriptionName.ValueKind == JsonValueKind.String
+                                    ? subscriptionName.GetString()
+                                    : null,
                             Amount = amountValue,
                             Period = subscriptionPeriod.GetString()!,
                             Models = modelNames,
