@@ -52,6 +52,8 @@ describe("settings API commands", () => {
       language: "fr",
       defaultPeriodDays: 30,
       customGroups: [],
+      customRates: [],
+      fixedSubscriptions: [],
     };
     vi.mocked(desktopApi.saveSettings).mockResolvedValue(undefined as never);
 

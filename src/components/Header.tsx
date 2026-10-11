@@ -38,7 +38,6 @@ interface Props {
   onToggleLive: () => void;
   onDisableLive: () => void;
   onOpenSettings: () => void;
-  onOpenRates: () => void;
   onOpenAbout: () => void;
   onOpenAudit: () => void;
   onSourceRefreshed: () => Promise<void>;
@@ -46,7 +45,7 @@ interface Props {
   showAudit: boolean;
 }
 
-export function Header({ live, liveConfigured, liveActive, liveAvailable, liveSaving, metrics, updatedAt, onToggleLive, onDisableLive, onOpenSettings, onOpenRates, onOpenAbout, onOpenAudit, onSourceRefreshed, auditButtonRef, showAudit }: Props) {
+export function Header({ live, liveConfigured, liveActive, liveAvailable, liveSaving, metrics, updatedAt, onToggleLive, onDisableLive, onOpenSettings, onOpenAbout, onOpenAudit, onSourceRefreshed, auditButtonRef, showAudit }: Props) {
   const { t, i18n } = useTranslation();
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [sources, setSources] = useState<InternalStoreSource[]>([]);
@@ -200,16 +199,13 @@ export function Header({ live, liveConfigured, liveActive, liveAvailable, liveSa
         <span className="header-updated" title={t("status.lastUpdated", { value: lastUpdated })}>
           {t("status.lastUpdated", { value: lastUpdated })}
         </span>
-        <button onClick={onOpenRates} style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12 }} aria-label={t("header.ratesLabel")}>
-          {t("header.rates")}
-        </button>
         <button onClick={onOpenAbout} style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12 }} aria-label={t("header.aboutLabel")}>
           {t("header.about")}
         </button>
-        <button ref={auditButtonRef} className="header-audit" onClick={onOpenAudit} style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12 }} aria-label={t(showAudit ? "header.dashboardLabel" : "header.auditLabel")}>
+        <button ref={auditButtonRef} className="header-audit header-primary-nav-action" onClick={onOpenAudit} style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12 }} aria-label={t(showAudit ? "header.dashboardLabel" : "header.auditLabel")}>
           {t(showAudit ? "header.dashboard" : "header.audit")}
         </button>
-        <button onClick={onOpenSettings} style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12 }} aria-label={t("header.settingsLabel")}>
+        <button className="header-primary-nav-action" onClick={onOpenSettings} style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12 }} aria-label={t("header.settingsLabel")}>
           {t("header.settings")}
         </button>
       </div>

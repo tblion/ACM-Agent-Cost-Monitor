@@ -8,21 +8,28 @@ internal static class SessionAggregator
     public static IReadOnlyList<SessionRecord> Aggregate(
         IEnumerable<UsageRow> rows,
         PricingCatalog catalog,
-        IReadOnlyDictionary<(string Provider, string Model), Rate> overrides)
+        IReadOnlyDictionary<(string Provider, string Model), Rate> overrides,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null)
     {
         var sessions = new Dictionary<string, SessionRecord>(StringComparer.Ordinal);
         var modelIndexes = new Dictionary<string, Dictionary<(string Provider, string Model), ModelUsage>>(StringComparer.Ordinal);
         var catalogIndex = PricingService.CreateIndex(catalog);
+        var customRateIndex = new ConfiguredRateIndex(customRates);
         foreach (var row in rows)
         {
             var tokensAreValid = row.Tokens?.IsValid == true;
-            var resolvedRate = tokensAreValid
-                ? PricingService.ResolveRateDetail(row, catalogIndex, overrides)
+            var includedBySubscription = row.MessageDate is { } messageDate
+                && PricingService.IsIncludedBySubscription(row, messageDate, fixedSubscriptions);
+            var resolvedRate = tokensAreValid || includedBySubscription
+                ? PricingService.ResolveRateDetail(row, catalogIndex, overrides, fixedSubscriptions, customRateIndex)
                 : null;
             var usedConfiguredRate = resolvedRate is not null;
-            var cost = resolvedRate is null
-                ? row.StoredCost
-                : CostCalculator.MessageCost(row.Tokens!, resolvedRate.Rate);
+            var cost = includedBySubscription
+                ? 0
+                : resolvedRate is null
+                    ? row.StoredCost
+                    : CostCalculator.MessageCost(row.Tokens!, resolvedRate.Rate);
             var tokens = tokensAreValid ? row.Tokens! : new Tokens();
             var sessionKey = row.SessionId;
 

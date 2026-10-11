@@ -6,10 +6,11 @@ import { useTranslation } from "react-i18next";
 import { formatCompactTokens, formatCurrency, formatNumber } from "../i18n/format";
 import { resolveLanguage } from "../i18n/locale";
 
-export function KpiCards({ data }: { data: SessionRecord[] }) {
+export function KpiCards({ data, fixedCost = 0 }: { data: SessionRecord[]; fixedCost?: number }) {
   const { t, i18n } = useTranslation();
   const language = resolveLanguage(i18n.language);
-  const cost = sumCost(data);
+   const usageCost = sumCost(data);
+   const cost = usageCost + fixedCost;
   const sources = costBySource(data);
   const totals = tokenTotals(data);
   const tokens = totals.input + totals.output + totals.cacheRead + totals.cacheWrite + totals.reasoning;
@@ -19,7 +20,8 @@ export function KpiCards({ data }: { data: SessionRecord[] }) {
   const cards = [
     {
        label: t("kpi.totalCost"), value: formatCurrency(cost, language), color: "#22d3ee",
-       sub: `${t("kpi.configured", { value: formatCurrency(sources.configured, language) })} · ${t("kpi.historical", { value: formatCurrency(sources.stored, language) })}`,
+        sub: `${t("kpi.configured", { value: formatCurrency(sources.configured, language) })} · ${t("kpi.historical", { value: formatCurrency(sources.stored, language) })}`,
+        fixedSub: fixedCost > 0 ? t("kpi.fixedCosts", { value: formatCurrency(fixedCost, language) }) : null,
        tooltip: t("kpi.totalCostTooltip"),
     },
     {
@@ -49,6 +51,7 @@ export function KpiCards({ data }: { data: SessionRecord[] }) {
           </div>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 6, color: c.color }}>{c.value}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>{c.sub}</div>
+          {c.fixedSub && <div style={{ marginTop: 3, color: "var(--muted)", fontSize: 11 }}>{c.fixedSub}</div>}
         </div>
       ))}
     </div>

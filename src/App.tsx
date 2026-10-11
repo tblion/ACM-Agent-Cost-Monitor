@@ -5,6 +5,7 @@ import type { CustomGroup } from "./types";
 import { filterSessions, type Filters } from "./lib/aggregate";
 import { sortDisplayValues } from "./lib/sorting";
 import { Header } from "./components/Header";
+import { AppSidebar } from "./components/AppSidebar";
 import { FilterBar } from "./components/FilterBar";
 import { KpiCards } from "./components/KpiCards";
 import { DeferredLoading } from "./components/DeferredLoading";
@@ -17,6 +18,7 @@ import { useLiveMode } from "./app/useLiveMode";
 import { useSettings } from "./app/useSettings";
 import { useDatePresetRollover } from "./app/useDatePresetRollover";
 import { defaultFilters } from "./app/defaultFilters";
+import { fixedCostForPeriod } from "./lib/fixed-costs";
 import "./App.css";
 
 const CostOverTime = lazy(() => import("./components/charts/CostOverTime").then(module => ({ default: module.CostOverTime })));
@@ -28,7 +30,6 @@ const TopSessions = lazy(() => import("./components/charts/TopSessions").then(mo
 const CostByGroup = lazy(() => import("./components/charts/CostByGroup").then(module => ({ default: module.CostByGroup })));
 const UsageByBilling = lazy(() => import("./components/charts/UsageByBilling").then(module => ({ default: module.UsageByBilling })));
 const SettingsModal = lazy(() => import("./components/SettingsModal").then(module => ({ default: module.SettingsModal })));
-const RatesModal = lazy(() => import("./components/RatesModal").then(module => ({ default: module.RatesModal })));
 const AboutModal = lazy(() => import("./components/AboutModal").then(module => ({ default: module.AboutModal })));
 const AuditView = lazy(() => import("./components/AuditView").then(module => ({ default: module.AuditView })));
 
@@ -48,7 +49,6 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>({});
   useDatePresetRollover(filters.datePreset, setFilters);
   const [showSettings, setShowSettings] = useState(false);
-  const [showRates, setShowRates] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const projectFilterOptionsRef = useRef<ProjectFilterOptions | null>(null);
   const filtersDirtyRef = useRef(false);
@@ -85,6 +85,10 @@ export default function App() {
   const { settings, settingsError, saveSettingsAndClose: saveSettingsAndCloseState } = settingsState;
   const { showAudit, setShowAudit, auditStale, setAuditStale, auditGeneration, auditGenerationRef, auditButtonRef, dashboardMainRef, auditContentRef } = audit;
   const { live, liveError, liveSaving, toggleLive, disableLive } = liveState;
+  const openAudit = () => {
+    setShowSettings(false);
+    setShowAudit(true);
+  };
   const saveSettingsAndClose = (nextSettings: Parameters<typeof saveSettingsAndCloseState>[0]) => saveSettingsAndCloseState(nextSettings, () => setShowSettings(false));
   const changeDataModeAndCloseSettings = async (mode: Parameters<typeof changeDataMode>[0]) => {
     await changeDataMode(mode);
@@ -119,6 +123,7 @@ export default function App() {
     projects: reconciledFilters.projects === undefined ? undefined : resolveProjectSelection(reconciledFilters.projects, projectFilterOptions),
   }), [reconciledFilters, projectFilterOptions]);
   const filtered = useMemo(() => filterSessions(data, effectiveFilters), [data, effectiveFilters]);
+  const fixedCost = fixedCostForPeriod(settings?.fixedSubscriptions ?? [], reconciledFilters.from, reconciledFilters.to);
   const activeGroup = useMemo<CustomGroup | undefined>(() => {
     const value = selectedGroupValue(reconciledFilters.projects ?? [], projectFilterOptions);
     const option = projectFilterOptions.groups.find(group => group.value === value);
@@ -126,13 +131,34 @@ export default function App() {
   }, [projectFilterOptions, reconciledFilters.projects]);
 
   if (!settings) return (
-    <div style={{ padding: 40, textAlign: "center" }} className="muted">
-       {settingsError ? <p role="alert">{t(settingsError.key, { defaultValue: settingsError.key, details: settingsError.details ?? "" })}</p> : t("app.loading")}
+    <div className="startup-screen">
+      <div className="startup-content">
+        <div className="startup-visual" aria-hidden="true">
+          <svg className="startup-chart" viewBox="0 0 320 160" fill="none">
+            <path className="startup-gridline" d="M16 132H304M16 92H304M16 52H304" />
+            <rect className="startup-bar startup-bar-one" x="42" y="91" width="30" height="41" rx="5" />
+            <rect className="startup-bar startup-bar-two" x="102" y="68" width="30" height="64" rx="5" />
+            <rect className="startup-bar startup-bar-three" x="162" y="79" width="30" height="53" rx="5" />
+            <rect className="startup-bar startup-bar-four" x="222" y="39" width="30" height="93" rx="5" />
+            <path className="startup-trend" d="M18 111L57 96L117 72L177 83L237 43L302 26" />
+            <circle className="startup-trend-dot" cx="302" cy="26" r="5" />
+          </svg>
+          <span className="startup-orbit startup-orbit-one" />
+          <span className="startup-orbit startup-orbit-two" />
+        </div>
+        <div className="startup-brand">ACM <span>·</span> Agent Cost Monitor</div>
+        <h1>{t("app.startupTitle")}</h1>
+        <p className="startup-message" role={settingsError ? "alert" : "status"} aria-live="polite">
+          {settingsError ? t(settingsError.key, { defaultValue: settingsError.key, details: settingsError.details ?? "" }) : t("app.loading")}
+        </p>
+        {!settingsError && <div className="startup-progress" aria-hidden="true"><span /></div>}
+      </div>
     </div>
   );
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <a className="skip-link" href="#app-content">{t("navigation.skipToContent")}</a>
       {dataMode === "demo" && (
         <div className="mock-banner" role="status">
           <strong>{t("app.demoBannerTitle")}</strong>
@@ -151,18 +177,24 @@ export default function App() {
         updatedAt={dataUpdatedAt}
         onToggleLive={toggleLive}
         onDisableLive={disableLive}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenRates={() => setShowRates(true)}
+        onOpenSettings={() => { setShowAudit(false); setShowSettings(true); }}
         onOpenAbout={() => setShowAbout(true)}
-        onOpenAudit={() => setShowAudit(current => !current)}
+        onOpenAudit={openAudit}
         onSourceRefreshed={async () => { await appData.reloadData(false); }}
         auditButtonRef={auditButtonRef}
         showAudit={showAudit}
       />
-      <main ref={dashboardMainRef} hidden={showAudit} tabIndex={-1} style={{ flex: 1, display: showAudit ? "none" : "flex", flexDirection: "column" }}>
+      <div className="app-workspace">
+        <AppSidebar
+          showSettings={showSettings || showAudit}
+          onDashboard={() => { setShowSettings(false); setShowAudit(false); }}
+          onSettings={() => { setShowAudit(false); setShowSettings(true); }}
+        />
+        <div className="app-view" id="app-content" tabIndex={-1}>
+      <main ref={dashboardMainRef} hidden={showAudit || showSettings} tabIndex={-1} style={{ flex: 1, display: showAudit || showSettings ? "none" : "flex", flexDirection: "column" }}>
         {dataError && <p role="alert" style={{ margin: "12px 20px 0", color: "var(--error)" }}>{t(dataError, { defaultValue: dataError })}</p>}
        <FilterBar filters={reconciledFilters} projects={projects} models={models} providers={providers} projectFilterOptions={projectFilterOptions} onChange={next => { filtersDirtyRef.current = true; setFilters(next); }} onReset={() => setFilters(defaultFilters(data, defaultPeriodDaysRef.current))} />
-        <KpiCards data={filtered} />
+        <KpiCards data={filtered} fixedCost={fixedCost} />
         <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, padding: "0 20px 16px", minHeight: 300 }}>
           <Suspense fallback={<DeferredLoading variant="dashboard" />}>
             <CostOverTime data={filtered} />
@@ -179,36 +211,26 @@ export default function App() {
           <SessionTable data={filtered} />
         </div>
       </main>
-      <div ref={auditContentRef} className="audit-content" data-testid="audit-content" hidden={!showAudit} tabIndex={-1}>
+      <div ref={auditContentRef} className="audit-content" data-testid="audit-content" hidden={!showAudit || showSettings} tabIndex={-1}>
         <Suspense fallback={<DeferredLoading variant="dashboard" />}>
           <AuditView
             dataSource={dataSource}
             stale={auditStale}
             auditGeneration={auditGeneration}
-            onBack={() => setShowAudit(false)}
+            onBack={() => { setShowAudit(false); setShowSettings(true); }}
             onSuccessfulReport={generation => {
               if (generation === auditGenerationRef.current) setAuditStale(false);
             }}
           />
         </Suspense>
       </div>
-        {showSettings && (
-          <Suspense fallback={<div className="modal-overlay"><DeferredLoading variant="modal" /></div>}>
-              <SettingsModal settings={settings} projects={projects} dataMode={dataMode} onDataModeChange={changeDataModeAndCloseSettings} onClose={() => setShowSettings(false)} onSave={saveSettingsAndClose} onStoreChanged={async () => { await appData.reloadData(false); }} />
+        {(showSettings || showAudit) && (
+          <Suspense fallback={<div className="settings-loading"><DeferredLoading variant="modal" /></div>}>
+            <SettingsModal settings={settings} projects={projects} dataMode={dataMode} onDataModeChange={changeDataModeAndCloseSettings} onClose={() => setShowSettings(false)} onSave={saveSettingsAndClose} onStoreChanged={async () => { await appData.reloadData(false); }} onOpenAudit={openAudit} dataSource={dataSource} currentSessions={data} onRecalculationStart={handleRecalculationStart} onDataRecalculated={handleDataRecalculated} onRecalculationError={handleRecalculationError} auditButtonRef={auditButtonRef} hidden={!showSettings} />
           </Suspense>
         )}
-      {showRates && (
-        <Suspense fallback={<div className="modal-overlay"><DeferredLoading variant="modal" /></div>}>
-          <RatesModal
-            dataSource={dataSource}
-            recalculableMessages={data.flatMap(session => session.models).filter(model => model.source === "configured").length}
-            onClose={() => setShowRates(false)}
-            onRecalculationStart={handleRecalculationStart}
-            onDataRecalculated={handleDataRecalculated}
-            onRecalculationError={handleRecalculationError}
-          />
-        </Suspense>
-      )}
+        </div>
+      </div>
       {showAbout && (
         <Suspense fallback={<div className="modal-overlay"><DeferredLoading variant="modal" /></div>}>
           <AboutModal onClose={() => setShowAbout(false)} />

@@ -8,23 +8,26 @@ Unlike the script, it provides a graphical interface with filters, charts, a sor
 
 ## Features
 
-- **KPIs**: total cost, tokens, number of sessions (including subagents), and number of projects for the filtered period.
+- **KPIs**: total cost, tokens, number of sessions (including subagents), and number of projects for the filtered period. Fixed subscriptions are added to the total on a separate line; the daily curve remains usage-only.
 - **Filters**: by project, model, provider, and date range.
 - **Charts**: cost over time, by project, model, and provider; token breakdown; most expensive sessions; and cost by project group (automatic parent folder plus custom groups).
 - **Audit**: trace which database rows, rates, and token counts produced the displayed totals.
 - **Session table**: sortable by date or cost, with a `rate ✓` badge (custom rate applied) or `cost 0` (local/free model, reported but not hidden).
 - **Live mode**: the `LIVE` button in the header enables automatic updates as soon as the opencode database changes (file watching with debounce).
-- **Persistent settings**: database and rates configuration paths, theme (system/light/dark), interface language, default period, and custom project groups. Saved separately from OpenCode's database.
+- **Persistent settings**: database and rates configuration paths, monthly or annual provider subscriptions (with covered models set to zero per token), theme (system/light/dark), interface language, default period, and custom project groups. Saved separately from OpenCode's database.
 
 ## Cost calculation and data handling
 
 For each assistant message, the application chooses a rate in this order:
 
-1. A custom rate in `opencode.jsonc` (`provider.<id>.models.<model>.cost`).
-2. The embedded pricing catalog, using the rate effective on the message date.
-3. The cost already stored by OpenCode when no rate can be resolved.
+1. An active fixed subscription covering that provider and model: its per-token cost is zero.
+2. A custom rate in `opencode.jsonc` (`provider.<id>.models.<model>.cost`).
+3. The embedded pricing catalog, using the rate effective on the message date.
+4. The cost already stored by OpenCode when no rate can be resolved.
 
 Input, output, cache-read, and cache-write tokens are priced separately. Reasoning tokens use the `output` rate. Calculations run locally; the app does not need provider API keys or query model APIs. The OpenCode database is opened read-only and is never migrated or rewritten. The app writes its own settings and user-requested exports only.
+
+Fixed subscriptions are counted once for each active month (annual payments are divided by 12), never distributed across days, sessions, or models. Covered models have zero usage cost while the subscription is active; other models keep their usual rates.
 
 ## Download
 
@@ -95,7 +98,7 @@ git push origin v1.2.3
 
 The release workflow requires a `v`-prefixed SemVer tag and verifies synchronized project versions before packaging. A separate manual Windows workflow can rebuild the NSIS and MSI installers for an existing release; it verifies that all five platform installers are present before succeeding. MSI upgrades are distributed by the DSI; NSIS is the per-user consumer installer.
 
-macOS signing/notarization and Windows signing are enabled in CI when their certificate and Apple notarization secrets are configured. Without those secrets, the installers are unsigned and the operating system may display a security warning on first launch.
+The current release is unsigned and is not notarized. macOS Gatekeeper or Windows SmartScreen may show a security warning; this is expected for an unsigned release and does not by itself indicate an application error. Continue only if the installer came from this repository's official [GitHub Releases](https://github.com/tblion/OpencodeCostsViewer/releases).
 
 ### Allow the application on macOS
 
@@ -115,9 +118,19 @@ Then relaunch the application. This command bypasses macOS download protection; 
 
 To remove these warnings automatically for all users, the application must be signed with an Apple Developer ID certificate and notarized by Apple. This configuration is not enabled in the repository yet.
 
+### Allow the application on Windows
+
+When Windows SmartScreen displays **Windows protected your PC** for the downloaded installer:
+
+1. Check that the installer came from the official GitHub release and that its filename matches the version you intended to install.
+2. Select **More info**.
+3. Select **Run anyway**.
+
+If Windows shows an **Unknown publisher** confirmation instead, continue only if you trust the downloaded installer. On a managed computer, organization policy may prevent bypassing the warning; contact your administrator rather than disabling SmartScreen or antivirus protection.
+
 ## Pricing catalog and releases
 
-The embedded catalog contains official API rates collected on September 23, 2026. Its source and generated form live in `src-dotnet/Resources/`. `effectiveFrom` dates are the catalog adoption dates because providers do not publish historical effective dates. Rates use the standard short-context tier; the Google Gemini Pro rate uses the `<=200k` token tier because the application does not know prompt size, and DeepSeek rates intentionally use the peak tier. To prepare a release, the repository generates a temporary catalog, validates it with the .NET backend, and replaces the embedded catalog atomically only after validation. The application validates the catalog again when loading it at runtime:
+The embedded catalog contains official API rates collected on October 11, 2026. Its source and generated form live in `src-dotnet/Resources/`. `effectiveFrom` dates are the catalog adoption dates because providers do not publish historical effective dates. Rates use the standard short-context tier; the Google Gemini Pro rate uses the `<=200k` token tier because the application does not know prompt size, and DeepSeek rates intentionally use the peak tier. Temporary promotions reflect the provider's published price on the collection date. To prepare a release, the repository generates a temporary catalog, validates it with the .NET backend, and replaces the embedded catalog atomically only after validation. The application validates the catalog again when loading it at runtime:
 
 ```sh
 npm run release:prepare

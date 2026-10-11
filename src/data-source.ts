@@ -1,7 +1,7 @@
 // Selects the live desktop API or demo data source for the renderer.
 import * as api from "./api";
 import { createDemoAuditReport, createDemoRecalculationResult, generateDemoSnapshot } from "./demo/generator";
-import { getE2eDemoSnapshot } from "./mock/desktop-mock";
+import { getE2eDemoSnapshot, getE2eRecalculationPreview } from "./mock/desktop-mock";
 import type { AuditReport, CatalogStatus, CostSummary, RateEntry, RecalculationResult, SessionRecord } from "./types";
 
 export type DataMode = "real" | "demo";
@@ -12,6 +12,8 @@ export interface AppDataSource {
   getCostSummary(): Promise<CostSummary[]>;
   getCatalogStatus(): Promise<CatalogStatus>;
   recalculate(): Promise<RecalculationResult>;
+  previewRecalculation?(): Promise<RecalculationResult>;
+  applyRecalculation?(): Promise<void>;
   getAuditReport(): Promise<AuditReport>;
 }
 
@@ -70,6 +72,10 @@ export function createDataSource(mode: DataMode, referenceDate?: number): AppDat
         if (import.meta.env.VITE_E2E === "true") window.__E2E__.markRecalculated();
         return createDemoRecalculationResult(import.meta.env.VITE_E2E === "true" ? getE2eDemoSnapshot() : snapshot);
       },
+      previewRecalculation: async () => import.meta.env.VITE_E2E === "true"
+        ? getE2eRecalculationPreview()
+        : createDemoRecalculationResult(snapshot),
+      applyRecalculation: async () => { if (import.meta.env.VITE_E2E === "true") window.__E2E__.markRecalculated(); },
       getAuditReport: async () => createDemoAuditReport(),
     };
   }
@@ -80,6 +86,8 @@ export function createDataSource(mode: DataMode, referenceDate?: number): AppDat
     getCostSummary: api.getCostSummary,
     getCatalogStatus: api.getCatalogStatus,
     recalculate: api.recalculateData,
+    previewRecalculation: api.previewRecalculation,
+    applyRecalculation: async () => {},
     getAuditReport: api.getAuditReport,
   };
 }

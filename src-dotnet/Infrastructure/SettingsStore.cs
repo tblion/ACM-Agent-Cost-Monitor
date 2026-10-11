@@ -1,6 +1,7 @@
 // Reads and writes application settings in the resolved settings directory.
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Globalization;
 using OpencodeCostsViewer.Backend.Application;
 using OpencodeCostsViewer.Backend.Models;
 
@@ -121,7 +122,7 @@ internal static class SettingsStore
             var invalidFields = new SortedSet<string>(StringComparer.Ordinal);
             var root = document.RootElement;
             var knownFields = new HashSet<string>(
-                ["dbPath", "configPath", "live", "theme", "language", "defaultPeriodDays", "customGroups"],
+                ["dbPath", "configPath", "live", "theme", "language", "defaultPeriodDays", "customGroups", "customRates", "fixedSubscriptions"],
                 StringComparer.Ordinal);
 
             foreach (var property in root.EnumerateObject())
@@ -232,6 +233,119 @@ internal static class SettingsStore
                 }
             }
 
+            if (root.TryGetProperty("customRates", out var customRates))
+            {
+                if (customRates.ValueKind != JsonValueKind.Array)
+                {
+                    invalidFields.Add("customRates");
+                }
+                else
+                {
+                    try
+                    {
+                        var rates = JsonSerializer.Deserialize<List<ConfiguredRateVersion>>(
+                            customRates.GetRawText(), JsonOptions);
+                        if (rates is null)
+                        {
+                            invalidFields.Add("customRates");
+                        }
+                        else
+                        {
+                            settings = settings with { CustomRates = rates };
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        invalidFields.Add("customRates");
+                    }
+                }
+            }
+
+            if (root.TryGetProperty("fixedSubscriptions", out var fixedSubscriptions))
+            {
+                if (fixedSubscriptions.ValueKind != JsonValueKind.Array)
+                {
+                    invalidFields.Add("fixedSubscriptions");
+                }
+                else
+                {
+                    var subscriptions = new List<FixedSubscription>();
+                    foreach (var subscription in fixedSubscriptions.EnumerateArray())
+                    {
+                        if (subscription.ValueKind != JsonValueKind.Object
+                            || subscription.EnumerateObject().Any(property => property.Name is not ("id" or "provider" or "amount" or "period" or "models" or "effectiveFrom" or "effectiveTo"))
+                            || (subscription.TryGetProperty("id", out var existingId)
+                                && (existingId.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(existingId.GetString())))
+                            || !subscription.TryGetProperty("provider", out var provider)
+                            || provider.ValueKind != JsonValueKind.String
+                            || string.IsNullOrWhiteSpace(provider.GetString())
+                            || !subscription.TryGetProperty("amount", out var amount)
+                            || !amount.TryGetDouble(out var amountValue)
+                            || !double.IsFinite(amountValue)
+                            || amountValue <= 0
+                            || !subscription.TryGetProperty("period", out var subscriptionPeriod)
+                            || subscriptionPeriod.ValueKind != JsonValueKind.String
+                            || subscriptionPeriod.GetString() is not ("monthly" or "annual")
+                            || !subscription.TryGetProperty("models", out var models)
+                            || models.ValueKind != JsonValueKind.Array
+                            || !subscription.TryGetProperty("effectiveFrom", out var effectiveFrom)
+                            || effectiveFrom.ValueKind != JsonValueKind.String
+                            || !IsValidDate(effectiveFrom.GetString())
+                            || !subscription.TryGetProperty("effectiveTo", out var effectiveTo)
+                            || (effectiveTo.ValueKind != JsonValueKind.Null
+                                && (effectiveTo.ValueKind != JsonValueKind.String || !IsValidDate(effectiveTo.GetString()))))
+                        {
+                            invalidFields.Add("fixedSubscriptions");
+                            continue;
+                        }
+
+                        var modelNames = new List<string>();
+                        var modelsValid = true;
+                        foreach (var model in models.EnumerateArray())
+                        {
+                            if (model.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(model.GetString()))
+                            {
+                                modelsValid = false;
+                                continue;
+                            }
+                            modelNames.Add(model.GetString()!);
+                        }
+
+                        var startDate = DateOnly.ParseExact(effectiveFrom.GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        var endDate = effectiveTo.ValueKind == JsonValueKind.String
+                            ? DateOnly.ParseExact(effectiveTo.GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture)
+                            : (DateOnly?)null;
+                        if (!modelsValid || (endDate is { } end && end < startDate))
+                        {
+                            invalidFields.Add("fixedSubscriptions");
+                            continue;
+                        }
+
+                        subscriptions.Add(new FixedSubscription
+                        {
+                            Id = subscription.TryGetProperty("id", out var subscriptionId)
+                                && subscriptionId.ValueKind == JsonValueKind.String
+                                && !string.IsNullOrWhiteSpace(subscriptionId.GetString())
+                                    ? subscriptionId.GetString()!
+                                    : Guid.NewGuid().ToString("N"),
+                            Provider = provider.GetString()!,
+                            Amount = amountValue,
+                            Period = subscriptionPeriod.GetString()!,
+                            Models = modelNames,
+                            EffectiveFrom = effectiveFrom.GetString()!,
+                            EffectiveTo = endDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        });
+                    }
+                    settings = settings with { FixedSubscriptions = subscriptions };
+                    if (subscriptions.Select(subscription => subscription.Id).Distinct(StringComparer.Ordinal).Count() != subscriptions.Count)
+                    {
+                        invalidFields.Add("fixedSubscriptions");
+                    }
+                }
+            }
+
+            if (!AreValidCustomRates(settings.CustomRates)) invalidFields.Add("customRates");
+
             var diagnostic = invalidFields.Count == 0
                 ? null
                 : new AppError("settings", $"Erreur de validation des réglages: champs invalides: {string.Join(", ", invalidFields)}");
@@ -299,7 +413,65 @@ internal static class SettingsStore
         {
             throw new InvalidDataException("Erreur de validation des réglages: groupe personnalisé invalide");
         }
+        if (settings.FixedSubscriptions is null
+            || settings.FixedSubscriptions.Any(subscription => subscription is null
+                || string.IsNullOrWhiteSpace(subscription.Id)
+                || string.IsNullOrWhiteSpace(subscription.Provider)
+                || !double.IsFinite(subscription.Amount)
+                || subscription.Amount <= 0
+                || subscription.Period is not ("monthly" or "annual")
+                || subscription.Models is null
+                || subscription.Models.Any(string.IsNullOrWhiteSpace)
+                || !IsValidDate(subscription.EffectiveFrom)
+                || (subscription.EffectiveTo is not null && !IsValidDate(subscription.EffectiveTo))
+                || (subscription.EffectiveTo is { } end && DateOnly.ParseExact(end, "yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    < DateOnly.ParseExact(subscription.EffectiveFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture))))
+        {
+            throw new InvalidDataException("Erreur de validation des réglages: forfait fixe invalide");
+        }
+        if (settings.FixedSubscriptions.Select(subscription => subscription.Id).Distinct(StringComparer.Ordinal).Count()
+            != settings.FixedSubscriptions.Count)
+        {
+            throw new InvalidDataException("Erreur de validation des réglages: identifiant de forfait fixe dupliqué");
+        }
+        if (!AreValidCustomRates(settings.CustomRates))
+        {
+            throw new InvalidDataException("Erreur de validation des réglages: tarif personnalisé invalide");
+        }
     }
+
+    private static bool AreValidCustomRates(IReadOnlyList<ConfiguredRateVersion>? rates)
+    {
+        if (rates is null || rates.Any(rate => rate is null
+            || string.IsNullOrWhiteSpace(rate.Id)
+            || string.IsNullOrWhiteSpace(rate.Provider)
+            || string.IsNullOrWhiteSpace(rate.Model)
+            || !new Rate(rate.Input, rate.Output, rate.CacheRead, rate.CacheWrite).IsValid
+            || !IsValidUtcTimestamp(rate.EffectiveFrom)
+            || string.IsNullOrWhiteSpace(rate.Source)))
+        {
+            return false;
+        }
+
+        if (rates.Select(rate => rate.Id).Distinct(StringComparer.Ordinal).Count() != rates.Count) return false;
+        var versions = new HashSet<(string Provider, string Model, long EffectiveTicks)>();
+        return rates.All(rate => versions.Add((rate.Provider, rate.Model,
+            DateTimeOffset.ParseExact(rate.EffectiveFrom, UtcTimestampFormats, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal).UtcTicks)));
+    }
+
+    private static readonly string[] UtcTimestampFormats =
+    [
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'",
+    ];
+
+    private static bool IsValidUtcTimestamp(string? value) => value is not null
+        && DateTimeOffset.TryParseExact(value, UtcTimestampFormats, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out _);
+
+    private static bool IsValidDate(string? value) => value is not null
+        && DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
 
     private static void WriteAtomic(string settingsDirectory, byte[] contents)
     {

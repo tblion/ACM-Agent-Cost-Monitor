@@ -55,7 +55,7 @@ vi.mock("../i18n/config", () => ({
 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
-const settings: Settings = { dbPath: null, configPath: null, live: false, theme: "light", language: "en", defaultPeriodDays: 30, customGroups: [] };
+const settings: Settings = { dbPath: null, configPath: null, live: false, theme: "light", language: "en", defaultPeriodDays: 30, customGroups: [], customRates: [], fixedSubscriptions: [] };
 const response: SettingsResponse = { settings, diagnostic: null, liveActive: false };
 const session = (id: string): SessionRecord => ({
   id, project: "project", title: id, date: 1, cost: 1,

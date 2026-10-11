@@ -23,9 +23,13 @@ const backendOperations = new Set([
   "get_internal_store_sources",
   "refresh_internal_store_source",
   "refresh_opencode_api",
+  "reimport_all_sources",
   "get_rates",
+  "get_catalog_rates",
   "get_catalog_status",
+  "get_pricing_candidates",
   "recalculate_data",
+  "preview_recalculation",
   "get_audit_report",
 ]);
 const maximumAuditExportBytes = 128 * 1024 * 1024;
@@ -174,7 +178,10 @@ ipcMain.handle(IPC_CHANNELS.openExternalUrl, async (event, input: unknown) => {
       throw { code: "invalid_input", message: "External URL must be a string." } satisfies ApiError;
     }
     const url = new URL(input);
-    if (url.protocol !== "https:" || url.hostname !== "github.com" || url.username || url.password) {
+    const allowedHosts = new Set([
+      "github.com", "developers.openai.com", "platform.claude.com", "ai.google.dev", "raw.githubusercontent.com",
+    ]);
+    if (url.protocol !== "https:" || !allowedHosts.has(url.hostname) || url.username || url.password) {
       throw { code: "invalid_input", message: "External URL is not allowed." } satisfies ApiError;
     }
     await shell.openExternal(url.toString());

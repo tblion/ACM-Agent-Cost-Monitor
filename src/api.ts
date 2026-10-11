@@ -3,7 +3,8 @@ import type { DesktopApi } from "../electron/renderer-api";
 import { invoke as invokeMock, listen as listenMock } from "./mock/desktop-mock";
 import type {
   ApiError, AuditReport, BackendLogEntry, CatalogStatus, CostSummary, InternalStoreMergeResult, InternalStoreSource, InternalStoreStatus, RateEntry, RecalculationResult,
-  ResolvedPaths, RuntimeMetrics, SessionRecord, Settings, SettingsResponse,
+  ResolvedPaths, RuntimeMetrics, SessionRecord, Settings, SettingsResponse, RecalculationPreview,
+  PricingLookupKey, PricingComparisonResult,
 } from "./types";
 
 export interface ApiCommandMap {
@@ -18,13 +19,17 @@ export interface ApiCommandMap {
   get_internal_store_sources: InternalStoreSource[];
   refresh_internal_store_source: void;
   refresh_opencode_api: void;
+  reimport_all_sources: void;
   export_internal_store: string | null;
   merge_internal_store: InternalStoreMergeResult | null;
   get_backend_logs: BackendLogEntry[];
   get_rates: RateEntry[];
+  get_catalog_rates: RateEntry[];
   get_cost_summary: CostSummary[];
   get_catalog_status: CatalogStatus;
+  get_pricing_candidates: PricingComparisonResult;
   recalculate_data: RecalculationResult;
+  preview_recalculation: RecalculationPreview;
   get_audit_report: AuditReport;
   export_audit_report: string | null;
 }
@@ -41,13 +46,17 @@ export interface ApiCommandArgs {
   get_internal_store_sources: undefined;
   refresh_internal_store_source: { sourceId: string };
   refresh_opencode_api: undefined;
+  reimport_all_sources: undefined;
   export_internal_store: undefined;
   merge_internal_store: undefined;
   get_backend_logs: undefined;
   get_rates: undefined;
+  get_catalog_rates: undefined;
   get_cost_summary: undefined;
   get_catalog_status: undefined;
+  get_pricing_candidates: { keys: PricingLookupKey[] };
   recalculate_data: undefined;
+  preview_recalculation: undefined;
   get_audit_report: undefined;
   export_audit_report: { content: string; suggestedName: string };
 }
@@ -113,6 +122,7 @@ export const getInternalStoreStatus = () => invokeCommand("get_internal_store_st
 export const getInternalStoreSources = () => invokeCommand("get_internal_store_sources");
 export const refreshInternalStoreSource = (sourceId: string) => invokeCommand("refresh_internal_store_source", { sourceId });
 export const refreshOpenCodeApi = () => invokeCommand("refresh_opencode_api");
+export const reimportAllSources = () => invokeCommand("reimport_all_sources");
 export const exportInternalStore = () => invokeCommand("export_internal_store");
 export const mergeInternalStore = () => invokeCommand("merge_internal_store");
 export const getBackendLogs = () => invokeCommand("get_backend_logs");
@@ -121,9 +131,12 @@ export const onBackendLog = (callback: (entry: BackendLogEntry) => void): (() =>
   return getDesktopApi().onBackendLog(callback);
 };
 export const getRates = () => invokeCommand("get_rates");
+export const getCatalogRates = () => invokeCommand("get_catalog_rates");
 export const getCostSummary = () => invokeCommand("get_cost_summary");
 export const getCatalogStatus = () => invokeCommand("get_catalog_status");
+export const getPricingCandidates = (keys: PricingLookupKey[]) => invokeCommand("get_pricing_candidates", { keys });
 export const recalculateData = () => invokeCommand("recalculate_data");
+export const previewRecalculation = () => invokeCommand("preview_recalculation");
 export const getAuditReport = () => invokeCommand("get_audit_report");
 export const exportAudit = (content: string, suggestedName: string) =>
   invokeCommand("export_audit_report", { content, suggestedName });
@@ -150,13 +163,17 @@ function invokeDesktopApi(
     case "get_internal_store_sources": return api.getInternalStoreSources();
     case "refresh_internal_store_source": return api.refreshInternalStoreSource((args as ApiCommandArgs["refresh_internal_store_source"]).sourceId);
     case "refresh_opencode_api": return api.refreshOpenCodeApi();
+    case "reimport_all_sources": return api.reimportAllSources();
     case "export_internal_store": return api.exportInternalStore();
     case "merge_internal_store": return api.mergeInternalStore();
     case "get_backend_logs": return api.getBackendLogs();
     case "get_rates": return api.getRates();
+    case "get_catalog_rates": return api.getCatalogRates();
     case "get_cost_summary": return api.getCostSummary();
     case "get_catalog_status": return api.getCatalogStatus();
+    case "get_pricing_candidates": return api.getPricingCandidates((args as ApiCommandArgs["get_pricing_candidates"]).keys);
     case "recalculate_data": return api.recalculateData();
+    case "preview_recalculation": return api.previewRecalculation();
     case "get_audit_report": return api.getAuditReport();
     case "export_audit_report": {
       const exportArguments = args as ApiCommandArgs["export_audit_report"];

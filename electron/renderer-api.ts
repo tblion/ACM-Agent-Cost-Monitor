@@ -10,8 +10,11 @@ import type {
   InternalStoreSource,
   RateEntry,
   RecalculationResult,
+  RecalculationPreview,
   ResolvedPaths,
   RuntimeMetrics,
+  PricingLookupKey,
+  PricingComparisonResult,
   SessionRecord,
   Settings,
   SettingsResponse,
@@ -29,13 +32,17 @@ export interface DesktopApi {
   getInternalStoreSources(): Promise<InternalStoreSource[]>;
   refreshInternalStoreSource(sourceId: string): Promise<void>;
   refreshOpenCodeApi(): Promise<void>;
+  reimportAllSources(): Promise<void>;
   exportInternalStore(): Promise<string | null>;
   mergeInternalStore(): Promise<InternalStoreMergeResult | null>;
   getBackendLogs(): Promise<BackendLogEntry[]>;
   onBackendLog(callback: (entry: BackendLogEntry) => void): () => void;
   getRates(): Promise<RateEntry[]>;
+  getCatalogRates(): Promise<RateEntry[]>;
   getCatalogStatus(): Promise<CatalogStatus>;
+  getPricingCandidates(keys: PricingLookupKey[]): Promise<PricingComparisonResult>;
   recalculateData(): Promise<RecalculationResult>;
+  previewRecalculation(): Promise<RecalculationPreview>;
   getAuditReport(): Promise<AuditReport>;
   pickPath(): Promise<string | null>;
   exportAuditReport(content: string, suggestedName: string): Promise<string | null>;

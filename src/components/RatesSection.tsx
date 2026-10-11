@@ -1,26 +1,27 @@
-// Displays pricing rates and lets users recalculate costs from the catalog.
+// Displays usage pricing and lets users explicitly recalculate historical costs.
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CatalogStatus, CostSummary, RateEntry, RecalculationDiagnostics, SessionRecord } from "../types";
+import type { CatalogStatus, CostSummary, RateEntry, RecalculationDiagnostics, RecalculationResult, SessionRecord } from "../types";
 import type { AppDataSource } from "../data-source";
-import { getFocusTrapTarget, isConfiguredRate, rateKey } from "../lib/rates";
+import { isConfiguredRate, rateKey } from "../lib/rates";
 import { useTranslation } from "react-i18next";
 import { formatCurrency, formatNumber } from "../i18n/format";
 import { resolveLanguage } from "../i18n/locale";
 import { translateApiError } from "../api";
+import { PricingComparison } from "./pricing/PricingComparison";
 
 interface Props {
   dataSource: AppDataSource;
-  recalculableMessages: number;
-  onClose: () => void;
+  currentSessions: SessionRecord[];
   onRecalculationStart: () => void;
   onDataRecalculated: (sessions: SessionRecord[]) => void;
   onRecalculationError: () => void;
 }
 
-export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalculationStart, onDataRecalculated, onRecalculationError }: Props) {
+export function RatesSection({ dataSource, currentSessions, onRecalculationStart, onDataRecalculated, onRecalculationError }: Props) {
   const { t, i18n } = useTranslation();
   const language = resolveLanguage(i18n.language);
   const [rates, setRates] = useState<RateEntry[]>([]);
+  const [search, setSearch] = useState("");
   const [costSummary, setCostSummary] = useState<CostSummary[]>([]);
   const [ratesLoading, setRatesLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -28,26 +29,15 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [preview, setPreview] = useState<RecalculationResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [recalculationLoading, setRecalculationLoading] = useState(false);
   const [recalculationError, setRecalculationError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<RecalculationDiagnostics | null>(null);
   const [loadedSource, setLoadedSource] = useState<AppDataSource | null>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const confirmationButtonRef = useRef<HTMLButtonElement>(null);
   const recalculationTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreTriggerFocusRef = useRef(false);
-  const recalculationLoadingRef = useRef(false);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    recalculationLoadingRef.current = recalculationLoading;
-  }, [recalculationLoading]);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -59,7 +49,8 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
     setSummaryError(null);
     setCatalogStatus(null);
     setCatalogError(null);
-    setConfirmationOpen(false);
+    setPreview(null);
+    setPreviewLoading(false);
     setRecalculationError(null);
     setDiagnostics(null);
     let pending = 3;
@@ -85,43 +76,32 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
     return () => { cancelled = true; };
   }, [dataSource]);
 
-  // Initial focus and its restoration depend only on the modal lifecycle.
   useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    const focusables = () => dialogRef.current
-      ? Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
-          .filter(el => !el.hasAttribute("disabled"))
-      : [];
-    focusables()[0]?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (!recalculationLoadingRef.current) onCloseRef.current();
-        return;
-      }
-      if (e.key === "Tab") {
-        const f = focusables();
-        const target = getFocusTrapTarget(f, document.activeElement, e.shiftKey);
-        if (target) { e.preventDefault(); target.focus(); }
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); prev?.focus(); };
-  }, []);
-
-  useEffect(() => {
-    if (confirmationOpen) {
+    if (preview) {
       confirmationButtonRef.current?.focus();
     } else if (restoreTriggerFocusRef.current) {
       restoreTriggerFocusRef.current = false;
       recalculationTriggerRef.current?.focus();
     }
-  }, [confirmationOpen, diagnostics]);
+  }, [preview, diagnostics]);
 
   const fmtRate = (v: number) => v === 0 ? t("common.noValue") : `${formatNumber(v, language)} ${t("rates.rateUnit")}`;
   const sourceIsCurrent = loadedSource === dataSource;
   const configuredKeys = useMemo(() => new Set(rates.filter(r => r.source === "configured").map(r => rateKey(r.provider, r.model))), [rates]);
-  const requestRecalculation = () => {
-    if (recalculationLoading) return;
+  const filteredRates = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase(language);
+    return query ? rates.filter(rate => `${rate.provider} ${rate.model}`.toLocaleLowerCase(language).includes(query)) : rates;
+  }, [language, rates, search]);
+  const previewCosts = useMemo(() => {
+    const before = currentSessions.reduce((total, session) => total + session.cost, 0);
+    if (!preview) return { before, after: 0, changedSessions: 0 };
+    const after = preview.sessions.reduce((total, session) => total + session.cost, 0);
+    const previousById = new Map(currentSessions.map(session => [session.id, session.cost]));
+    const changedSessions = preview.sessions.filter(session => previousById.get(session.id) !== session.cost).length;
+    return { before, after, changedSessions };
+  }, [currentSessions, preview]);
+  const requestRecalculation = async () => {
+    if (recalculationLoading || previewLoading) return;
     if (!catalogStatus?.valid) {
       setRecalculationError(catalogError ? "rates.catalogError" : "rates.invalidCatalog");
       return;
@@ -129,25 +109,34 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
     recalculationTriggerRef.current = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
     restoreTriggerFocusRef.current = true;
     setRecalculationError(null);
-    setConfirmationOpen(true);
+    setPreviewLoading(true);
+    try {
+      setPreview(await (dataSource.previewRecalculation?.() ?? dataSource.recalculate()));
+    } catch (error) {
+      setRecalculationError(translateApiError(error, key => t(key as never), t("rates.previewError")));
+      onRecalculationError();
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const cancelRecalculation = () => {
-    if (recalculationLoading) return;
-    setConfirmationOpen(false);
+    if (recalculationLoading || previewLoading) return;
+    setPreview(null);
+    restoreTriggerFocusRef.current = true;
   };
 
   const confirmRecalculation = async () => {
-    if (recalculationLoading) return;
+    if (recalculationLoading || !preview) return;
     setRecalculationLoading(true);
     setRecalculationError(null);
     onRecalculationStart();
     try {
-      const result = await dataSource.recalculate();
-      setDiagnostics(result.diagnostics);
-      setConfirmationOpen(false);
+      await dataSource.applyRecalculation?.();
+      setDiagnostics(preview.diagnostics);
+      setPreview(null);
       restoreTriggerFocusRef.current = true;
-      onDataRecalculated(result.sessions);
+      onDataRecalculated(preview.sessions);
     } catch (error) {
       setRecalculationError(translateApiError(error, key => t(key as never), t("rates.recalculationError")));
       onRecalculationError();
@@ -156,23 +145,23 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
     }
   };
 
+  const refreshRates = async () => setRates(await dataSource.getRates());
+
   return (
-       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}
-          onClick={e => { if (e.target === e.currentTarget && !recalculationLoading) onClose(); }}>
-      <div className="panel" ref={dialogRef} style={{ width: 680, maxWidth: "95vw", maxHeight: "85vh", overflowY: "auto" }} role="dialog" aria-modal="true" aria-labelledby="rates-title">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 id="rates-title" style={{ margin: 0, fontSize: 16 }}>{t("rates.title")}</h2>
-            <button onClick={onClose} disabled={recalculationLoading} aria-label={t("rates.close")} className="modal-close">×</button>
-        </div>
+      <div className="pricing-rates-content">
 
         <section aria-labelledby="configured-rates-title">
            <h3 id="configured-rates-title" style={{ fontSize: 14, margin: "0 0 8px" }}>{t("rates.availableTitle")}</h3>
+           <p id="usage-rate-help" style={{ color: "var(--muted)", fontSize: 12 }}>{t("rates.rateDetails")}</p>
+           <label htmlFor="usage-rate-search" style={{ display: "block", marginBottom: 8 }}>{t("rates.searchLabel")}</label>
+           <input id="usage-rate-search" type="search" value={search} onChange={event => setSearch(event.target.value)} aria-describedby="usage-rate-help" placeholder={t("rates.searchPlaceholder")} />
            {(ratesLoading || !sourceIsCurrent) && <p role="status" style={{ color: "var(--muted)", fontSize: 13 }}>{t("rates.configuredLoading")}</p>}
           {sourceIsCurrent && ratesError && <p role="alert" style={{ color: "var(--error)", fontSize: 13 }}>{t(ratesError, { defaultValue: ratesError })}</p>}
-          {sourceIsCurrent && !ratesLoading && !ratesError && rates.length === 0 && (
-             <p style={{ color: "var(--muted)", fontSize: 13 }}>{t("rates.configuredEmpty")}</p>
-          )}
-          {sourceIsCurrent && !ratesLoading && !ratesError && rates.length > 0 && (
+           {sourceIsCurrent && !ratesLoading && !ratesError && rates.length === 0 && (
+              <p style={{ color: "var(--muted)", fontSize: 13 }}>{t("rates.configuredEmpty")}</p>
+           )}
+           {sourceIsCurrent && !ratesLoading && !ratesError && search.trim().length > 0 && filteredRates.length === 0 && <p role="status">{t("rates.noSearchResults")}</p>}
+           {sourceIsCurrent && !ratesLoading && !ratesError && filteredRates.length > 0 && (
              <div className="rates-table-scroll" role="region" tabIndex={0} aria-label={t("rates.ratesRegion")}>
             <table style={{ minWidth: 760, width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <caption style={{ textAlign: "left", paddingBottom: 6 }}>{t("rates.availableCaption")}</caption>
@@ -184,12 +173,13 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.outputRate")}</th>
                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.cacheRead")}</th>
                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.cacheWrite")}</th>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.source")}</th>
+                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.source")}</th>
+                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.effectiveFrom")}</th>
               </tr>
             </thead>
             <tbody>
-              {rates.map((r, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+              {filteredRates.map((r, i) => (
+                <tr key={`${r.provider}:${r.model}:${r.effectiveFrom ?? "unknown"}:${i}`} style={{ borderBottom: "1px solid var(--border)" }}>
                   <td style={{ padding: "7px 10px" }}>{r.provider}</td>
                   <td style={{ padding: "7px 10px", fontFamily: "monospace" }}>{r.model}</td>
                   <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.input)}</td>
@@ -197,6 +187,7 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
                   <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.cacheRead)}</td>
                   <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.cacheWrite)}</td>
                     <td style={{ padding: "7px 10px" }}><span className="badge">{t(r.source === "configured" ? "rates.configuredSource" : "rates.catalogSource")}</span></td>
+                    <td style={{ padding: "7px 10px" }}>{r.effectiveFrom ?? t("rates.currentRate")}</td>
                 </tr>
               ))}
             </tbody>
@@ -204,6 +195,8 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
             </div>
           )}
         </section>
+
+        <PricingComparison rates={rates} onApplied={refreshRates} />
 
         <section aria-labelledby="historical-costs-title" style={{ marginTop: 24 }}>
            <h3 id="historical-costs-title" style={{ fontSize: 14, margin: "0 0 8px" }}>{t("rates.historicalTitle")}</h3>
@@ -252,22 +245,31 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
           <p style={{ color: "var(--muted)", fontSize: 13 }}>{t("rates.recalculationDescription")}</p>
            {catalogError && <p role="alert" style={{ color: "var(--error)", fontSize: 13 }}>{t(catalogError, { defaultValue: catalogError })}</p>}
            {recalculationError && <p role="alert" style={{ color: "var(--error)", fontSize: 13 }}>{t(recalculationError, { defaultValue: recalculationError })}</p>}
-          {confirmationOpen && (
-            <div className="panel" aria-labelledby="recalculation-confirmation-title" style={{ marginTop: 12 }}>
-              <h4 id="recalculation-confirmation-title" style={{ margin: "0 0 8px" }}>{t("rates.confirmationTitle")}</h4>
-              <p role="status" aria-live="polite">{t("rates.confirmationTitle")}</p>
-              <p>{t("rates.confirmationDescription", { count: formatNumber(recalculableMessages, language) })}</p>
+          {preview && (
+            <section className="panel" aria-labelledby="recalculation-preview-title" style={{ marginTop: 12 }}>
+              <h4 id="recalculation-preview-title" style={{ margin: "0 0 8px" }}>{t("rates.previewTitle")}</h4>
+              <p role="status" aria-live="polite">{t("rates.previewSummary", { messages: formatNumber(preview.diagnostics.recalculableMessages, language), sessions: formatNumber(previewCosts.changedSessions, language) })}</p>
+              <dl>
+                <div><dt>{t("rates.costBefore")}</dt><dd>{formatCurrency(previewCosts.before, language)}</dd></div>
+                <div><dt>{t("rates.costAfter")}</dt><dd>{formatCurrency(previewCosts.after, language)}</dd></div>
+                <div><dt>{t("rates.costDifference")}</dt><dd>{formatCurrency(previewCosts.after - previewCosts.before, language)}</dd></div>
+              </dl>
+              <p>{t("rates.missingDates", { count: formatNumber(preview.diagnostics.missingDates, language) })}</p>
+              <p>{t("rates.missingTokens", { count: formatNumber(preview.diagnostics.missingTokens, language) })}</p>
+              <p>{t("rates.missingRates", { count: formatNumber(preview.diagnostics.missingRates, language) })}</p>
+              <p>{t("rates.storedFallbacks")}</p>
               <div className="modal-actions">
-                <button type="button" onClick={cancelRecalculation} disabled={recalculationLoading}>{t("rates.cancelRecalculation")}</button>
+                <button type="button" onClick={cancelRecalculation} disabled={recalculationLoading}>{t("rates.cancelPreview")}</button>
                 <button ref={confirmationButtonRef} type="button" onClick={confirmRecalculation} disabled={recalculationLoading}>{recalculationLoading ? t("rates.recalculating") : t("rates.confirmRecalculation")}</button>
               </div>
-            </div>
+            </section>
           )}
-          {!confirmationOpen && (
-            <button ref={recalculationTriggerRef} type="button" onClick={requestRecalculation} disabled={recalculationLoading || !sourceIsCurrent || !catalogStatus}>
-              {t("rates.recalculate")}
+          {!preview && (
+            <button ref={recalculationTriggerRef} type="button" onClick={() => void requestRecalculation()} disabled={recalculationLoading || previewLoading || !sourceIsCurrent || !catalogStatus}>
+              {t("rates.previewRecalculation")}
             </button>
           )}
+          {previewLoading && <p role="status">{t("rates.previewLoading")}</p>}
           {recalculationLoading && <p role="status" aria-live="polite">{t("rates.recalculating")}</p>}
           {diagnostics && (
             <div role="status" style={{ marginTop: 12 }}>
@@ -280,10 +282,6 @@ export function RatesModal({ dataSource, recalculableMessages, onClose, onRecalc
           )}
         </section>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-           <button onClick={onClose} disabled={recalculationLoading} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: recalculationLoading ? "var(--disabled-text)" : "var(--control-text)", cursor: recalculationLoading ? "not-allowed" : "pointer" }}>{t("rates.closeButton")}</button>
-        </div>
       </div>
-    </div>
   );
 }

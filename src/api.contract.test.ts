@@ -29,6 +29,8 @@ const settings: Settings = {
   language: "fr",
   defaultPeriodDays: 30,
   customGroups: [],
+  customRates: [],
+  fixedSubscriptions: [],
 };
 
 describe("SettingsResponse contract", () => {

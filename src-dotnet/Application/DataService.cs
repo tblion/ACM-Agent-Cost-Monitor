@@ -8,16 +8,24 @@ namespace OpencodeCostsViewer.Backend.Application;
 
 internal static class DataService
 {
-    public static IReadOnlyList<SessionRecord> Compute(string databasePath, string configPath)
+    public static IReadOnlyList<SessionRecord> Compute(
+        string databasePath,
+        string configPath,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null)
     {
         var inputs = LoadInputs(databasePath, configPath);
-        return SessionAggregator.Aggregate(inputs.Rows, inputs.Catalog, inputs.Rates);
+        return SessionAggregator.Aggregate(inputs.Rows, inputs.Catalog, inputs.Rates, fixedSubscriptions, customRates);
     }
 
-    public static IReadOnlyList<RateEntry> GetRates(string databasePath, string configPath)
+    public static IReadOnlyList<RateEntry> GetRates(
+        string databasePath,
+        string configPath,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null)
     {
         var inputs = LoadInputs(databasePath, configPath);
-        return PricingService.RatesForRows(inputs.Rows, inputs.Catalog, inputs.Rates);
+        return PricingService.RatesForRows(inputs.Rows, inputs.Catalog, inputs.Rates, fixedSubscriptions, customRates);
     }
 
     public static IReadOnlyList<CostSummary> ComputeCostSummary(string databasePath, string configPath)
@@ -37,20 +45,34 @@ internal static class DataService
             .ToArray();
     }
 
-    public static RecalculationResult Recalculate(string databasePath, string configPath)
+    public static RecalculationResult Recalculate(
+        string databasePath,
+        string configPath,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null)
     {
         var inputs = LoadInputs(databasePath, configPath);
         return new RecalculationResult(
-            SessionAggregator.Aggregate(inputs.Rows, inputs.Catalog, inputs.Rates),
-            BuildDiagnostics(inputs.Rows, inputs.Catalog, inputs.Rates));
+            SessionAggregator.Aggregate(inputs.Rows, inputs.Catalog, inputs.Rates, fixedSubscriptions, customRates),
+            BuildDiagnostics(inputs.Rows, inputs.Catalog, inputs.Rates, fixedSubscriptions, customRates));
     }
+
+    public static RecalculationResult Preview(
+        string databasePath,
+        string configPath,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null) =>
+        Recalculate(databasePath, configPath, fixedSubscriptions, customRates);
 
     public static RecalculationDiagnostics BuildDiagnostics(
         IReadOnlyList<UsageRow> rows,
         PricingCatalog catalog,
-        IReadOnlyDictionary<(string Provider, string Model), Rate> rates)
+        IReadOnlyDictionary<(string Provider, string Model), Rate> rates,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null)
     {
         var catalogIndex = PricingService.CreateIndex(catalog);
+        var customRateIndex = new ConfiguredRateIndex(customRates);
         var recalculableMessages = 0;
         var missingDates = 0;
         var missingTokens = 0;
@@ -60,7 +82,7 @@ internal static class DataService
             var validTokens = row.Tokens?.IsValid == true;
             if (row.MessageDate is null) missingDates++;
             if (!validTokens) missingTokens++;
-            var hasRate = PricingService.ResolveRateDetail(row, catalogIndex, rates) is not null;
+            var hasRate = PricingService.ResolveRateDetail(row, catalogIndex, rates, fixedSubscriptions, customRateIndex) is not null;
             if (validTokens && hasRate) recalculableMessages++;
             if (!hasRate) missingRates++;
         }

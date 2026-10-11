@@ -20,6 +20,7 @@ vi.mock("./api", () => ({
   getRates: vi.fn(),
   getCatalogStatus: vi.fn(),
   recalculateData: vi.fn(),
+  previewRecalculation: vi.fn(),
   getAuditReport: vi.fn(),
 }));
 

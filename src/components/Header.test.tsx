@@ -29,7 +29,6 @@ async function renderHeader(live: boolean, liveConfigured: boolean, onToggleLive
       onToggleLive,
       onDisableLive,
       onOpenSettings: vi.fn(),
-      onOpenRates: vi.fn(),
       onOpenAbout: vi.fn(),
       onOpenAudit: vi.fn(),
       onSourceRefreshed: async () => {},

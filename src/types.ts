@@ -11,10 +11,30 @@ export interface SessionRecord {
   source: CostSource; models: ModelUsage[]; messages?: MessageUsage[];
 }
 export interface CustomGroup { name: string; projects: string[]; }
+export interface FixedSubscription {
+  id: string;
+  provider: string;
+  amount: number;
+  period: "monthly" | "annual";
+  models: string[];
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+export interface ConfiguredRateVersion {
+  id: string;
+  provider: string;
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  effectiveFrom: string;
+  source: string;
+}
 export interface Settings {
   dbPath: string | null; configPath: string | null; live: boolean;
   theme: "system" | "light" | "dark"; language: SupportedLanguage | null;
-  defaultPeriodDays: number; customGroups: CustomGroup[];
+  defaultPeriodDays: number; customGroups: CustomGroup[]; customRates: ConfiguredRateVersion[]; fixedSubscriptions: FixedSubscription[];
 }
 export interface ApiError { code: string; message: string; }
 export interface BackendLogEntry { timestamp: string; level: string; message: string; exception: string | null; }
@@ -56,6 +76,18 @@ export interface RateEntry {
 }
 export interface CostSummary { provider: string; model: string; messages: number; storedCost: number; configured: boolean; }
 export interface CatalogStatus { valid: boolean; version: number; generatedAt: string; sourceVersion: string; rateCount: number; }
+export interface PricingLookupKey { kind: "usage" | "subscription"; provider: string; model: string; }
+export interface PricingCandidate {
+  sourceId: string; sourceType: "official" | "aggregator" | "other"; sourceName: string; sourceUrl: string;
+  retrievedAt: string; effectiveFrom: string | null; provider: string; model: string; region: string | null;
+  currency: string; unit: string; input: number | null; output: number | null; cacheRead: number | null;
+  cacheWrite: number | null; matchStatus: "exact" | "ambiguous" | "unmatched"; confidenceReasons: string[];
+}
+export interface PricingSourceResult {
+  sourceId: string; sourceType: "official" | "aggregator" | "other"; sourceName: string; sourceUrl: string;
+  status: "available" | "error"; error: string | null; candidates: PricingCandidate[];
+}
+export interface PricingComparisonResult { retrievedAt: string; sources: PricingSourceResult[]; }
 export interface RecalculationDiagnostics {
   catalogueValid: boolean;
   recalculableMessages: number;
@@ -64,6 +96,7 @@ export interface RecalculationDiagnostics {
   missingRates: number;
 }
 export interface RecalculationResult { sessions: SessionRecord[]; diagnostics: RecalculationDiagnostics; }
+export interface RecalculationPreview extends RecalculationResult {}
 
 export interface CostBreakdown {
   input: number;

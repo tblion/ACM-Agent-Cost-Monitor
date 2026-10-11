@@ -7,7 +7,11 @@ namespace OpencodeCostsViewer.Backend.Application;
 
 internal static class AuditService
 {
-    public static AuditReport Build(string databasePath, string configPath)
+    public static AuditReport Build(
+        string databasePath,
+        string configPath,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions = null,
+        IReadOnlyList<ConfiguredRateVersion>? customRates = null)
     {
         DatabaseAuditSnapshot snapshot;
         try
@@ -58,6 +62,8 @@ internal static class AuditService
                 snapshot.TotalMessages,
                 catalog,
                 overrides,
+                fixedSubscriptions,
+                customRates,
                 new AuditPaths(InternalDatabase.DatabasePath, configPath, "embedded://pricing.json"));
         }
         catch (Exception exception) when (exception is InvalidDataException or OverflowException)

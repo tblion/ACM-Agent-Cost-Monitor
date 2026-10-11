@@ -22,7 +22,14 @@ public sealed class PricingRate
     public required double Output { get; init; }
     public required double CacheRead { get; init; }
     public required double CacheWrite { get; init; }
+    public long? ContextThresholdTokens { get; init; }
+    public Rate? AboveContext { get; init; }
     public required string Source { get; init; }
+
+    public Rate RateForContext(double contextTokens) =>
+        ContextThresholdTokens is { } threshold && contextTokens > threshold && AboveContext is { } above
+            ? above
+            : new Rate(Input, Output, CacheRead, CacheWrite);
 }
 
 public enum RateSource

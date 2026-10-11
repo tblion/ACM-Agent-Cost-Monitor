@@ -34,6 +34,8 @@ const baseSettings: Settings = {
   language: "fr",
   defaultPeriodDays: 30,
   customGroups: [],
+  customRates: [],
+  fixedSubscriptions: [],
 };
 
 async function renderModal(customGroups: Settings["customGroups"], onSave = vi.fn()): Promise<HTMLElement> {
@@ -50,7 +52,17 @@ async function renderModal(customGroups: Settings["customGroups"], onSave = vi.f
       onClose: vi.fn(),
       onSave,
       onStoreChanged: vi.fn(),
+      onOpenAudit: vi.fn(),
+      dataSource: { getRates: vi.fn().mockResolvedValue([]), getCostSummary: vi.fn().mockResolvedValue([]), getCatalogStatus: vi.fn().mockResolvedValue({ valid: true, version: 1, generatedAt: "", sourceVersion: "", rateCount: 0 }), getData: vi.fn().mockResolvedValue([]), recalculate: vi.fn(), getAuditReport: vi.fn() },
+      currentSessions: [],
+      onRecalculationStart: vi.fn(),
+      onDataRecalculated: vi.fn(),
+      onRecalculationError: vi.fn(),
+      auditButtonRef: { current: null },
     })));
+  });
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-section="projects"]')?.click();
   });
   return container;
 }

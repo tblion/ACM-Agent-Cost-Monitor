@@ -22,6 +22,8 @@ internal static class AuditReportBuilder
         long totalMessages,
         PricingCatalog catalog,
         IReadOnlyDictionary<(string Provider, string Model), Rate> overrides,
+        IReadOnlyList<FixedSubscription>? fixedSubscriptions,
+        IReadOnlyList<ConfiguredRateVersion>? customRates,
         AuditPaths paths)
     {
         var failed = new List<string>();
@@ -60,6 +62,7 @@ internal static class AuditReportBuilder
         long invalidRate = 0;
         long storedCostFallback = 0;
         var catalogIndex = PricingService.CreateIndex(catalog);
+        var customRateIndex = new ConfiguredRateIndex(customRates);
 
         foreach (var row in sortedRows)
         {
@@ -69,9 +72,11 @@ internal static class AuditReportBuilder
             }
 
             var tokens = row.Tokens is { IsValid: true } ? row.Tokens : null;
+            var includedBySubscription = row.MessageDate is { } messageDate
+                && PricingService.IsIncludedBySubscription(row, messageDate, fixedSubscriptions);
             var hasInvalidCustomRate = overrides.TryGetValue((row.Provider, row.Model), out var configuredRate)
                 && !configuredRate.IsValid;
-            var resolvedRate = PricingService.ResolveRateDetail(row, catalogIndex, overrides);
+            var resolvedRate = PricingService.ResolveRateDetail(row, catalogIndex, overrides, fixedSubscriptions, customRateIndex);
             var anomalies = new List<AuditAnomaly>();
 
             if (tokens is null)
@@ -123,9 +128,11 @@ internal static class AuditReportBuilder
             var breakdown = tokens is not null && resolvedRate is not null
                 ? CostCalculator.MessageCostBreakdown(tokens, resolvedRate.Rate)
                 : null;
-            double? calculatedCost = tokens is not null && resolvedRate is not null
-                ? IndependentCostReference(tokens, resolvedRate.Rate)
-                : null;
+            double? calculatedCost = includedBySubscription
+                ? 0
+                : tokens is not null && resolvedRate is not null
+                    ? IndependentCostReference(tokens, resolvedRate.Rate)
+                    : null;
             var selectedCost = calculatedCost ?? row.StoredCost;
             var costSource = calculatedCost is not null
                 ? rateSource switch
@@ -303,7 +310,9 @@ internal static class AuditReportBuilder
             .FirstOrDefault();
         if (catalogRate is null) return null;
 
-        var rate = new Rate(catalogRate.Input, catalogRate.Output, catalogRate.CacheRead, catalogRate.CacheWrite);
+        var tokens = row.Tokens;
+        var contextTokens = tokens is null ? 0 : tokens.Input + tokens.CacheRead + tokens.CacheWrite;
+        var rate = catalogRate.RateForContext(contextTokens);
         return rate.IsValid
             ? new IndependentRate(rate, AuditRateSource.Catalog, catalogRate.EffectiveFrom)
             : null;

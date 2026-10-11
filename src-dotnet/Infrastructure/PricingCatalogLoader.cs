@@ -119,6 +119,31 @@ internal static partial class PricingCatalogLoader
             }
         }
 
+        if (rate.ContextThresholdTokens is <= 0)
+        {
+            throw new InvalidDataException($"rates[{index}].contextThresholdTokens must be positive");
+        }
+        if ((rate.ContextThresholdTokens is null) != (rate.AboveContext is null))
+        {
+            throw new InvalidDataException($"rates[{index}].contextThresholdTokens and aboveContext must be specified together");
+        }
+        if (rate.AboveContext is { } aboveContext)
+        {
+            foreach (var (field, value) in new[]
+            {
+                ("aboveContext.input", aboveContext.Input),
+                ("aboveContext.output", aboveContext.Output),
+                ("aboveContext.cacheRead", aboveContext.CacheRead),
+                ("aboveContext.cacheWrite", aboveContext.CacheWrite),
+            })
+            {
+                if (!double.IsFinite(value) || value < 0)
+                {
+                    throw new InvalidDataException($"rates[{index}].{field} must be finite and non-negative");
+                }
+            }
+        }
+
         foreach (var (field, value) in new[]
         {
             ("input", rate.Input),

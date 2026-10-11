@@ -8,23 +8,26 @@ Contrairement au script, elle offre une interface graphique : filtres, graphique
 
 ## Fonctionnalités
 
-- **KPIs** : coût total, tokens, nombre de sessions (dont sous-agents), nombre de projets sur la période filtrée.
+- **KPIs** : coût total, tokens, nombre de sessions (dont sous-agents), nombre de projets sur la période filtrée. Les forfaits fixes sont ajoutés au total sur une ligne distincte ; la courbe quotidienne reste limitée aux coûts d'usage.
 - **Filtres** : par projet, modèle, provider et plage de dates.
 - **Graphiques** : coût dans le temps, par projet, modèle et provider ; décomposition des tokens ; top sessions coûteuses ; coût par groupe de projet (dossier parent automatique et groupes personnalisés).
 - **Audit** : retracer les lignes de base, tarifs et compteurs de tokens à l'origine des totaux affichés.
 - **Tableau des sessions** : triable par date ou coût, avec badge `tarif ✓` (tarif custom appliqué) ou `coût 0` (modèle local/gratuit, signalé mais non masqué).
 - **Mode live** : le bouton `LIVE` dans le header active la mise à jour automatique dès que la base opencode change (surveillance du fichier avec debounce).
-- **Réglages persistants** : chemins de la base et de la configuration des tarifs, thème (système/clair/sombre), langue de l'interface, période par défaut et groupes personnalisés. Enregistrés séparément de la base OpenCode.
+- **Réglages persistants** : chemins de la base et de la configuration des tarifs, forfaits mensuels ou annuels par provider (avec modèles couverts à 0 par token), thème (système/clair/sombre), langue de l'interface, période par défaut et groupes personnalisés. Enregistrés séparément de la base OpenCode.
 
 ## Calcul des coûts et traitement des données
 
 Pour chaque message assistant, le tarif est choisi dans cet ordre :
 
-1. Le tarif custom défini dans `opencode.jsonc` (`provider.<id>.models.<model>.cost`).
-2. Le catalogue de tarifs embarqué, selon le tarif applicable à la date du message.
-3. Le coût déjà enregistré par OpenCode lorsqu'aucun tarif ne peut être résolu.
+1. Un forfait fixe actif qui couvre ce provider et ce modèle : son coût au token est nul.
+2. Le tarif custom défini dans `opencode.jsonc` (`provider.<id>.models.<model>.cost`).
+3. Le catalogue de tarifs embarqué, selon le tarif applicable à la date du message.
+4. Le coût déjà enregistré par OpenCode lorsqu'aucun tarif ne peut être résolu.
 
 Les tokens d'entrée, de sortie, de lecture du cache et d'écriture du cache sont tarifés séparément. Les tokens de reasoning utilisent le tarif `output`. Les calculs sont locaux : aucune clé API ni requête aux API des modèles n'est nécessaire. La base OpenCode est ouverte en lecture seule ; elle n'est ni migrée ni réécrite. L'application écrit uniquement ses propres réglages et les exports demandés par l'utilisateur.
+
+Les forfaits fixes sont comptés une fois par mois actif (un paiement annuel est divisé par 12), sans être répartis par jour, session ou modèle. Les modèles couverts ont un coût d'usage nul pendant la période du forfait ; les autres conservent leur tarif habituel.
 
 ## Téléchargement
 
@@ -95,7 +98,7 @@ git push origin v1.2.3
 
 Le workflow vérifie que le tag SemVer `v...` correspond aux versions synchronisées du projet avant de construire les installateurs. Le workflow `.github/workflows/windows-release.yml`, lancé manuellement, peut reconstruire le `.exe` NSIS et le MSI pour une release existante ; il vérifie que les cinq installateurs multiplateformes sont présents. Les mises à jour MSI sont distribuées par la DSI ; le `.exe` NSIS est destiné aux installations par utilisateur.
 
-La signature/notarisation macOS et la signature Windows sont activées en CI si les secrets de certificat et de notarisation Apple sont configurés. Sans ces secrets, les installateurs ne sont pas signés et le système peut afficher un avertissement de sécurité au premier lancement.
+La release actuelle n'est pas signée et n'est pas notarisée. Gatekeeper sur macOS ou SmartScreen sur Windows peut afficher un avertissement de sécurité ; c'est attendu pour une release non signée et ne signifie pas, à lui seul, que l'application est en erreur. Continuer uniquement si l'installateur provient des [releases GitHub officielles](https://github.com/tblion/OpencodeCostsViewer/releases).
 
 ### Autoriser l'application sur macOS
 
@@ -115,9 +118,19 @@ Relancer ensuite l'application. Cette commande contourne la protection de télé
 
 Pour supprimer ces avertissements automatiquement pour tous les utilisateurs, il faut signer l'application avec un certificat Apple Developer ID et la faire notarier par Apple. Cette configuration n'est pas encore activée dans le dépôt.
 
+### Autoriser l'application sur Windows
+
+Si SmartScreen affiche **Windows a protégé votre ordinateur** pour l'installateur téléchargé :
+
+1. Vérifier que l'installateur provient de la release GitHub officielle et que son nom correspond à la version voulue.
+2. Cliquer sur **Informations complémentaires**.
+3. Cliquer sur **Exécuter quand même**.
+
+Si Windows affiche plutôt une confirmation indiquant un **éditeur inconnu**, continuer uniquement si l'installateur téléchargé est digne de confiance. Sur un ordinateur géré par une organisation, une stratégie peut empêcher le contournement : contacter l'administrateur au lieu de désactiver SmartScreen ou l'antivirus.
+
 ## Catalogue de tarifs et releases
 
-Le catalogue embarqué contient les tarifs API officiels relevés le 23 septembre 2026. Sa source et sa version générée se trouvent dans `src-dotnet/Resources/`. Les dates `effectiveFrom` sont les dates d'adoption du catalogue, faute de dates d'effet historiques publiées par les fournisseurs. Les tarifs sont ceux du standard short-context ; le tarif Google Gemini Pro correspond au palier `<=200k` tokens, car l'application ne connaît pas la taille du prompt, et les tarifs DeepSeek utilisent volontairement le palier peak. Pour préparer une release, le dépôt génère un catalogue temporaire, le valide avec le backend .NET, puis ne remplace le catalogue embarqué atomiquement qu'après validation. L'application valide aussi le catalogue lors de son chargement à l'exécution :
+Le catalogue embarqué contient les tarifs API officiels relevés le 11 octobre 2026. Sa source et sa version générée se trouvent dans `src-dotnet/Resources/`. Les dates `effectiveFrom` sont les dates d'adoption du catalogue, faute de dates d'effet historiques publiées par les fournisseurs. Les tarifs sont ceux du standard short-context ; le tarif Google Gemini Pro correspond au palier `<=200k` tokens, car l'application ne connaît pas la taille du prompt, et les tarifs DeepSeek utilisent volontairement le palier peak. Les promotions temporaires reflètent le prix affiché par le fournisseur à la date de relevé. Pour préparer une release, le dépôt génère un catalogue temporaire, le valide avec le backend .NET, puis ne remplace le catalogue embarqué atomiquement qu'après validation. L'application valide aussi le catalogue lors de son chargement à l'exécution :
 
 ```sh
 npm run release:prepare

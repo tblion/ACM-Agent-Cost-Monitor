@@ -45,15 +45,15 @@ vi.mock("./data-source", () => ({
   resolveDataMode: vi.fn(() => "real"),
   writeDataMode: vi.fn(),
 }));
-vi.mock("./components/Header", () => ({ Header: ({ onOpenRates, onOpenSettings, onOpenAbout, onOpenAudit, onToggleLive, onDisableLive, liveConfigured, liveActive, auditButtonRef, metrics, updatedAt }: { onOpenRates: () => void; onOpenSettings: () => void; onOpenAbout: () => void; onOpenAudit: () => void; onToggleLive: () => void; onDisableLive: () => void; liveConfigured: boolean; liveActive: boolean; auditButtonRef?: { current: HTMLButtonElement | null }; metrics: RuntimeMetrics | null; updatedAt: number | null }) => {
+vi.mock("./components/Header", () => ({ Header: ({ onOpenSettings, onOpenAbout, onOpenAudit, onToggleLive, onDisableLive, liveConfigured, liveActive, auditButtonRef, metrics, updatedAt }: { onOpenSettings: () => void; onOpenAbout: () => void; onOpenAudit: () => void; onToggleLive: () => void; onDisableLive: () => void; liveConfigured: boolean; liveActive: boolean; auditButtonRef?: { current: HTMLButtonElement | null }; metrics: RuntimeMetrics | null; updatedAt: number | null }) => {
   const formatBytes = (value: number) => value >= 1024 ? `${value / 1024} KiB` : `${value} B`;
   const databaseSize = metrics?.databaseSizeBytes == null ? "Valeur indisponible" : formatBytes(metrics.databaseSizeBytes);
   const memory = metrics?.processMemoryBytes == null ? "Valeur indisponible" : formatBytes(metrics.processMemoryBytes);
   const lastUpdated = updatedAt == null ? "Valeur indisponible" : new Date(updatedAt).toLocaleDateString("fr-FR", { timeZone: "UTC" });
   return createElement("div", {},
     createElement("div", { className: "header-runtime" }, `Taille de la base de données ${databaseSize} Mémoire RSS du processus ${memory}`),
-    createElement("span", { className: "header-updated" }, `Dernière mise à jour des données : ${lastUpdated}`),
-      createElement("button", { onClick: onOpenRates }, "rates"),
+      createElement("span", { className: "header-updated" }, `Dernière mise à jour des données : ${lastUpdated}`),
+      createElement("button", { onClick: onOpenSettings }, "rates"),
       createElement("button", { onClick: onOpenSettings }, "settings"),
       createElement("button", { onClick: onOpenAbout }, "about"),
       createElement("button", { ref: auditButtonRef, onClick: onOpenAudit }, "audit"),
@@ -95,15 +95,15 @@ vi.mock("./components/FilterBar", () => ({ FilterBar: ({ filters, onChange, onRe
 } }));
 vi.mock("./components/KpiCards", () => ({ KpiCards: ({ data }: { data: SessionRecord[] }) => createElement("div", { "data-testid": "kpis" }, data.map(session => session.id).join(",")) }));
 vi.mock("./components/SessionTable", () => ({ SessionTable: ({ data }: { data: SessionRecord[] }) => createElement("div", { "data-testid": "table" }, data.map(session => session.id).join(",")) }));
-vi.mock("./components/RatesModal", () => ({ RatesModal: ({ onRecalculationStart, onDataRecalculated, onRecalculationError }: { onRecalculationStart: () => void; onDataRecalculated: (sessions: SessionRecord[]) => void; onRecalculationError: () => void }) => createElement("div", { "data-testid": "rates-modal" },
-  createElement("button", { onClick: onRecalculationStart }, "start recalculation"),
-  createElement("button", { onClick: () => onDataRecalculated([session("new-kept", "project"), session("new-hidden", "other")] as SessionRecord[]) }, "finish recalculation"),
-  createElement("button", { onClick: onRecalculationError }, "fail recalculation"),
-)}));
-vi.mock("./components/SettingsModal", () => ({ SettingsModal: ({ onDataModeChange, projects, settings, onSave }: { onDataModeChange: (mode: "demo") => void; projects: string[]; settings: Settings; onSave: (settings: Settings) => Promise<void> }) => createElement("div", { "data-testid": "settings-modal" },
+vi.mock("./components/SettingsModal", () => ({ SettingsModal: ({ onDataModeChange, projects, settings, onSave, onRecalculationStart, onDataRecalculated, onRecalculationError }: { onDataModeChange: (mode: "demo") => void; projects: string[]; settings: Settings; onSave: (settings: Settings) => Promise<void>; onRecalculationStart: () => void; onDataRecalculated: (sessions: SessionRecord[]) => void; onRecalculationError: () => void }) => createElement("div", { "data-testid": "settings-modal" },
   createElement("span", { "data-testid": "settings-projects" }, projects.join(",")),
   createElement("button", { onClick: () => onDataModeChange("demo") }, "switch mode"),
   createElement("button", { onClick: () => onSave({ ...settings, customGroups: [{ name: "Renamed Clients", projects: ["/work/a"] }] }) }, "rename group"),
+  createElement("div", { "data-testid": "rates-section" },
+    createElement("button", { onClick: onRecalculationStart }, "start recalculation"),
+    createElement("button", { onClick: () => onDataRecalculated([session("new-kept", "project"), session("new-hidden", "other")] as SessionRecord[]) }, "finish recalculation"),
+    createElement("button", { onClick: onRecalculationError }, "fail recalculation"),
+  ),
 ) }));
 vi.mock("./components/AboutModal", () => ({ AboutModal: () => createElement("div", { "data-testid": "about-modal" }) }));
 vi.mock("./components/charts/CostOverTime", () => ({ CostOverTime: ({ data }: { data: SessionRecord[] }) => {
@@ -125,7 +125,7 @@ vi.mock("./components/charts/UsageByBilling", () => ({ UsageByBilling: () => nul
 import { getRuntimeMetrics, getSettingsStatus, saveSettings } from "./api";
 import App, { defaultFilters } from "./App";
 
-const settings: Settings = { dbPath: null, configPath: null, live: false, theme: "light", language: "fr", defaultPeriodDays: 3650, customGroups: [] };
+const settings: Settings = { dbPath: null, configPath: null, live: false, theme: "light", language: "fr", defaultPeriodDays: 3650, customGroups: [], customRates: [], fixedSubscriptions: [] };
 const getSettings = getSettingsStatus as unknown as () => Promise<SettingsResponse>;
 const settingsResponse = (overrides: Partial<SettingsResponse> = {}): SettingsResponse => ({
   settings: overrides.settings ?? settings,
@@ -193,28 +193,24 @@ describe("App deferred modals", () => {
 
     act(() => { (Array.from(container.querySelectorAll("button")).find(button => button.textContent === "settings") as HTMLButtonElement).click(); });
 
-    expect(container.querySelector(".modal-overlay .deferred-loading-modal")).not.toBeNull();
+    expect(container.querySelector(".settings-loading .deferred-loading-modal")).not.toBeNull();
 
     await act(async () => { await Promise.resolve(); });
 
     expect(container.querySelector('[data-testid="settings-modal"]')).not.toBeNull();
-    expect(container.querySelector(".modal-overlay .deferred-loading-modal")).toBeNull();
+    expect(container.querySelector(".settings-loading .deferred-loading-modal")).toBeNull();
   });
 
-  it("resolves the RatesModal after showing the compact modal fallback and preserves callbacks", async () => {
+  it("keeps rate management within settings instead of opening a separate modal", async () => {
     const container = await renderApp();
 
-    act(() => { (Array.from(container.querySelectorAll("button")).find(button => button.textContent === "rates") as HTMLButtonElement).click(); });
-
-    expect(container.querySelector(".modal-overlay .deferred-loading-modal")).not.toBeNull();
+    act(() => { (Array.from(container.querySelectorAll("button")).find(button => button.textContent === "settings") as HTMLButtonElement).click(); });
 
     await act(async () => { await Promise.resolve(); });
 
-    expect(container.querySelector('[data-testid="rates-modal"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="settings-modal"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="rates-modal"]')).toBeNull();
     expect(container.querySelector(".modal-overlay .deferred-loading-modal")).toBeNull();
-
-    await act(async () => { (Array.from(container.querySelectorAll("button")).find(button => button.textContent === "start recalculation") as HTMLButtonElement).click(); });
-    expect(container.querySelector('[role="status"]')?.textContent).toContain("Chargement");
   });
 
   it("resolves the AboutModal after showing the compact modal fallback", async () => {
@@ -370,7 +366,7 @@ describe("App audit navigation", () => {
 
   it("focuses audit content on open and returns focus to the audit trigger", async () => {
     const container = await renderApp();
-    const auditButton = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "audit") as HTMLButtonElement;
+    const auditButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "audit") as HTMLButtonElement;
 
     await act(async () => { auditButton.click(); await Promise.resolve(); });
 

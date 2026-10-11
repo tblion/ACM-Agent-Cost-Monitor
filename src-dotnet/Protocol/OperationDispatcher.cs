@@ -38,11 +38,15 @@ internal sealed class OperationDispatcher : IDisposable
                 "get_internal_store_sources" => InternalStoreService.GetSources(),
                 "refresh_internal_store_source" => RefreshInternalStoreSource(arguments),
                 "refresh_opencode_api" => await RefreshOpenCodeApi(cancellationToken),
+                "reimport_all_sources" => await ReimportAllSources(cancellationToken),
                 "export_internal_store" => ExportInternalStore(arguments),
                 "merge_internal_store" => MergeInternalStore(arguments),
                 "get_rates" => GetRates(),
+                "get_catalog_rates" => GetCatalogRates(),
                 "get_catalog_status" => GetCatalogStatus(),
+                "get_pricing_candidates" => await GetPricingCandidates(arguments, cancellationToken),
                 "recalculate_data" => RecalculateData(),
+                "preview_recalculation" => PreviewRecalculation(),
                 "get_audit_report" => GetAuditReport(),
                 _ => throw new ProtocolException("invalid_input", $"Unknown operation: {operation}"),
             };
@@ -58,13 +62,15 @@ internal sealed class OperationDispatcher : IDisposable
 
     private IReadOnlyList<SessionRecord> GetData()
     {
-        var paths = SettingsService.ResolvePaths(SettingsService.LoadForCommands());
-        return DataService.Compute(paths.Db, paths.Config);
+        var settings = SettingsService.LoadForCommands();
+        var paths = SettingsService.ResolvePaths(settings);
+        return DataService.Compute(paths.Db, paths.Config, settings.FixedSubscriptions, settings.CustomRates);
     }
 
     private IReadOnlyList<CostSummary> GetCostSummary()
     {
-        var paths = SettingsService.ResolvePaths(SettingsService.LoadForCommands());
+        var settings = SettingsService.LoadForCommands();
+        var paths = SettingsService.ResolvePaths(settings);
         return DataService.ComputeCostSummary(paths.Db, paths.Config);
     }
 
@@ -158,6 +164,12 @@ internal sealed class OperationDispatcher : IDisposable
         return null;
     }
 
+    private static async Task<object?> ReimportAllSources(CancellationToken cancellationToken)
+    {
+        await UsageImportService.ReimportAllAsync(cancellationToken);
+        return null;
+    }
+
     private static string ReadPathArgument(JsonElement arguments)
     {
         if (!arguments.TryGetProperty("path", out var path)
@@ -171,8 +183,27 @@ internal sealed class OperationDispatcher : IDisposable
 
     private IReadOnlyList<RateEntry> GetRates()
     {
-        var paths = SettingsService.ResolvePaths(SettingsService.LoadForCommands());
-        return DataService.GetRates(paths.Db, paths.Config);
+        var settings = SettingsService.LoadForCommands();
+        var paths = SettingsService.ResolvePaths(settings);
+        return DataService.GetRates(paths.Db, paths.Config, settings.FixedSubscriptions, settings.CustomRates);
+    }
+
+    private static IReadOnlyList<RateEntry> GetCatalogRates()
+    {
+        var catalog = PricingCatalogLoader.LoadEmbedded();
+        return catalog.Rates.Select(rate => new RateEntry(
+                rate.Provider,
+                rate.Model,
+                rate.Input,
+                rate.Output,
+                rate.CacheRead,
+                rate.CacheWrite,
+                "catalog",
+                rate.EffectiveFrom))
+            .OrderBy(rate => rate.Provider, StringComparer.Ordinal)
+            .ThenBy(rate => rate.Model, StringComparer.Ordinal)
+            .ThenBy(rate => rate.EffectiveFrom, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private CatalogStatus GetCatalogStatus()
@@ -187,15 +218,51 @@ internal sealed class OperationDispatcher : IDisposable
         }
     }
 
+    private static async Task<PricingComparisonResult> GetPricingCandidates(
+        JsonElement arguments,
+        CancellationToken cancellationToken)
+    {
+        if (!arguments.TryGetProperty("keys", out var keysValue) || keysValue.ValueKind != JsonValueKind.Array)
+            throw new ProtocolException("invalid_input", "Pricing lookup keys must be an array.");
+        PricingLookupKey[] keys;
+        try
+        {
+            keys = JsonSerializer.Deserialize<PricingLookupKey[]>(keysValue.GetRawText(), ProtocolJson.Options)
+                ?? throw new JsonException("Pricing lookup keys must not be null.");
+        }
+        catch (JsonException exception)
+        {
+            throw new ProtocolException("invalid_input", $"Invalid pricing lookup keys: {exception.Message}");
+        }
+        try
+        {
+            using var comparisonService = new PricingComparisonService();
+            return await comparisonService.GetCandidatesAsync(keys, cancellationToken);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new ProtocolException("invalid_input", exception.Message);
+        }
+    }
+
     private RecalculationResult RecalculateData()
     {
-        var paths = SettingsService.ResolvePaths(SettingsService.LoadForCommands());
-        return DataService.Recalculate(paths.Db, paths.Config);
+        var settings = SettingsService.LoadForCommands();
+        var paths = SettingsService.ResolvePaths(settings);
+        return DataService.Recalculate(paths.Db, paths.Config, settings.FixedSubscriptions, settings.CustomRates);
+    }
+
+    private RecalculationResult PreviewRecalculation()
+    {
+        var settings = SettingsService.LoadForCommands();
+        var paths = SettingsService.ResolvePaths(settings);
+        return DataService.Preview(paths.Db, paths.Config, settings.FixedSubscriptions, settings.CustomRates);
     }
 
     private AuditReport GetAuditReport()
     {
-        var paths = SettingsService.ResolvePaths(SettingsService.LoadForCommands());
-        return AuditService.Build(paths.Db, paths.Config);
+        var settings = SettingsService.LoadForCommands();
+        var paths = SettingsService.ResolvePaths(settings);
+        return AuditService.Build(paths.Db, paths.Config, settings.FixedSubscriptions, settings.CustomRates);
     }
 }

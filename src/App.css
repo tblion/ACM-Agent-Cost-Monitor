@@ -1,4 +1,42 @@
 /* Styles dashboard sections, charts, and audit views. */
+.startup-screen {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  place-items: center;
+  overflow: hidden;
+  padding: 32px;
+  background: radial-gradient(ellipse at 50% 38%, color-mix(in srgb, var(--accent) 12%, var(--bg)), var(--bg) 68%);
+}
+.startup-content { display: flex; width: min(440px, 100%); flex-direction: column; align-items: center; text-align: center; }
+.startup-visual { position: relative; width: min(320px, 100%); margin-bottom: 30px; }
+.startup-chart { display: block; width: 100%; overflow: visible; }
+.startup-gridline { stroke: var(--border); stroke-width: 1; }
+.startup-bar { fill: color-mix(in srgb, var(--accent) 38%, var(--panel)); transform-box: fill-box; transform-origin: bottom; animation: startup-rise 900ms cubic-bezier(.2,.75,.3,1) both; }
+.startup-bar-one { animation-delay: 100ms; }
+.startup-bar-two { animation-delay: 220ms; }
+.startup-bar-three { animation-delay: 340ms; }
+.startup-bar-four { fill: var(--accent); animation-delay: 460ms; }
+.startup-trend { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 340; stroke-dashoffset: 340; animation: startup-draw 1.4s 300ms ease-out forwards; }
+.startup-trend-dot { fill: var(--accent); transform-box: fill-box; transform-origin: center; animation: startup-pulse 1.6s 1.7s ease-in-out infinite; }
+.startup-orbit { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: .45; }
+.startup-orbit-one { top: 16%; left: 8%; animation: startup-float 3s ease-in-out infinite; }
+.startup-orbit-two { right: 8%; bottom: 23%; width: 5px; height: 5px; animation: startup-float 3.4s 500ms ease-in-out infinite reverse; }
+.startup-brand { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .035em; }
+.startup-brand span { padding: 0 4px; color: var(--accent); }
+.startup-content h1 { margin: 12px 0 0; font-size: clamp(24px, 5vw, 32px); font-weight: 650; letter-spacing: -.04em; }
+.startup-message { min-height: 24px; margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+.startup-progress { width: 150px; height: 3px; margin-top: 22px; overflow: hidden; border-radius: 99px; background: var(--border); }
+.startup-progress span { display: block; width: 40%; height: 100%; border-radius: inherit; background: var(--accent); animation: startup-progress 1.5s ease-in-out infinite; }
+@keyframes startup-rise { from { transform: scaleY(.1); opacity: .3; } to { transform: scaleY(1); opacity: 1; } }
+@keyframes startup-draw { to { stroke-dashoffset: 0; } }
+@keyframes startup-pulse { 50% { transform: scale(1.45); opacity: .65; } }
+@keyframes startup-float { 50% { transform: translateY(-9px); } }
+@keyframes startup-progress { 0% { transform: translateX(-110%); } 100% { transform: translateX(260%); } }
+@media (prefers-reduced-motion: reduce) {
+  .startup-bar, .startup-trend, .startup-trend-dot, .startup-orbit-one, .startup-orbit-two, .startup-progress span { animation: none; }
+  .startup-trend { stroke-dashoffset: 0; }
+}
 .audit-view { display: grid; gap: 16px; padding: 24px 20px 32px; }
 .audit-content:focus { outline: 3px solid var(--accent); outline-offset: -3px; }
 .audit-heading, .audit-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

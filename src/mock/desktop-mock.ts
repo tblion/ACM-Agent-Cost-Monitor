@@ -2,6 +2,7 @@
 import type { RuntimeMetrics, Settings, SettingsResponse, ResolvedPaths, SessionRecord } from "../types";
 import { DEMO_AUDIT_REPORT } from "../demo/audit-fixture";
 import { createDemoRecalculationResult, generateDemoSnapshot, type DemoSnapshot } from "../demo/generator";
+import { DEMO_RATES } from "../demo/catalog";
 
 const e2e = import.meta.env.VITE_E2E === "true";
 const e2eFixtureId = import.meta.env.VITE_E2E_FIXTURE_ID ?? "";
@@ -28,6 +29,8 @@ const settings: Settings = {
   language: null,
   defaultPeriodDays: e2eScenario === "settings-period" ? 7 : e2eScenario === "settings-period-invalid" ? 0 : 30,
   customGroups: [],
+  customRates: [],
+  fixedSubscriptions: [],
 };
 const demoSnapshot = generateDemoSnapshot(Date.now());
 let currentSnapshot = e2eFixtureSnapshot ?? demoSnapshot;
@@ -65,6 +68,17 @@ function getE2eSnapshot(): DemoSnapshot {
 
 export function getE2eDemoSnapshot(): DemoSnapshot {
   return e2e ? getE2eSnapshot() : demoSnapshot;
+}
+
+export function getE2eRecalculationPreview() {
+  const preview = createDemoRecalculationResult(getE2eSnapshot());
+  if (!e2e) return preview;
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  return {
+    ...preview,
+    sessions: [...preview.sessions, e2eSession("recalculated", "Recalculated fixture session", date.getTime())],
+  };
 }
 
 if (e2e) {
@@ -112,6 +126,23 @@ export async function invoke<T>(cmd: string, args?: unknown): Promise<T> {
     case "save_settings": {
       const next = (args as { s: Settings }).s;
       if (e2eScenario === "live-save-error" && next.live) throw { code: "watcher", message: "fixture refused" };
+      const customRateIds = new Set<string>();
+      const customRateVersions = new Set<string>();
+      const validCustomRates = Array.isArray(next.customRates) && next.customRates.every(rate => {
+        const version = `${rate.provider}\u0000${rate.model}\u0000${rate.effectiveFrom}`;
+        const valid = typeof rate.id === "string" && rate.id.trim().length > 0
+          && typeof rate.provider === "string" && rate.provider.trim().length > 0
+          && typeof rate.model === "string" && rate.model.trim().length > 0
+          && [rate.input, rate.output, rate.cacheRead, rate.cacheWrite].every(value => Number.isFinite(value) && value >= 0)
+          && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/.test(rate.effectiveFrom)
+          && Number.isFinite(Date.parse(rate.effectiveFrom))
+          && typeof rate.source === "string" && rate.source.trim().length > 0
+          && !customRateIds.has(rate.id) && !customRateVersions.has(version);
+        customRateIds.add(rate.id);
+        customRateVersions.add(version);
+        return valid;
+      });
+      if (!validCustomRates) throw { code: "settings", message: "customRates is invalid" };
       const previousDbPath = settings.dbPath;
       if (!Number.isInteger(next.defaultPeriodDays) || next.defaultPeriodDays < 1 || next.defaultPeriodDays > 3650) next.defaultPeriodDays = 30;
       Object.assign(settings, next);
@@ -157,14 +188,49 @@ export async function invoke<T>(cmd: string, args?: unknown): Promise<T> {
     }] as unknown as T;
     case "refresh_internal_store_source": return undefined as T;
     case "refresh_opencode_api": return undefined as T;
+    case "reimport_all_sources": return undefined as T;
     case "export_internal_store": return "synthetic://agent-usage.sqlite" as unknown as T;
     case "merge_internal_store": return { projectsAdded: 0, sessionsAdded: 0, messagesAdded: 0 } as unknown as T;
     case "get_backend_logs": return [] as unknown as T;
     case "get_data": return getE2eSnapshot().sessions as unknown as T;
     case "get_rates": return getE2eSnapshot().rates as unknown as T;
+    case "get_catalog_rates": return DEMO_RATES as unknown as T;
     case "get_cost_summary": return getE2eSnapshot().costSummary as unknown as T;
     case "get_catalog_status":
       return { valid: true, version: 1, generatedAt: "2026-01-01T00:00:00Z", sourceVersion: "demo", rateCount: demoSnapshot.rates.length } as unknown as T;
+    case "get_pricing_candidates":
+      {
+        const requested = (args as { keys?: Array<{ provider: string; model: string }> } | undefined)?.keys ?? [];
+        const matches = requested.some(key => key.provider.toLowerCase() === "openai" && key.model === "gpt-4.1");
+        if (!matches || e2eScenario !== "pricing-comparison") {
+          return { retrievedAt: new Date().toISOString(), sources: [] } as unknown as T;
+        }
+        const retrievedAt = new Date().toISOString();
+        return {
+          retrievedAt,
+          sources: [
+            {
+              sourceId: "openai-official", sourceType: "official", sourceName: "OpenAI (official)",
+              sourceUrl: "https://developers.openai.com/api/docs/pricing", status: "available", error: null,
+              candidates: [{ sourceId: "openai-official", sourceType: "official", sourceName: "OpenAI (official)",
+                sourceUrl: "https://developers.openai.com/api/docs/pricing", retrievedAt, effectiveFrom: "2026-10-01",
+                provider: "OpenAI", model: "gpt-4.1", region: null, currency: "USD", unit: "per_million_tokens",
+                input: 2.1, output: 8.2, cacheRead: 0.5, cacheWrite: null, matchStatus: "exact",
+                confidenceReasons: ["Tarif officiel", "Identifiant exact", "Dernière vérification récente"] }],
+            },
+            {
+              sourceId: "litellm", sourceType: "aggregator", sourceName: "LiteLLM (community-maintained)",
+              sourceUrl: "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+              status: "available", error: null,
+              candidates: [{ sourceId: "litellm", sourceType: "aggregator", sourceName: "LiteLLM (community-maintained)",
+                sourceUrl: "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json", retrievedAt,
+                effectiveFrom: null, provider: "OpenAI", model: "gpt-4.1", region: null, currency: "USD",
+                unit: "per_million_tokens", input: 2, output: 8, cacheRead: 0.5, cacheWrite: null,
+                matchStatus: "exact", confidenceReasons: ["Agrégateur communautaire", "Désaccord sur le tarif"] }],
+            },
+          ],
+        } as unknown as T;
+      }
     case "get_runtime_metrics": {
       const includeDatabaseSize = (args as { includeDatabaseSize?: boolean } | undefined)?.includeDatabaseSize ?? false;
       return { ...demoRuntimeMetrics, databaseSizeBytes: includeDatabaseSize ? demoRuntimeMetrics.databaseSizeBytes : null } as unknown as T;
@@ -172,6 +238,7 @@ export async function invoke<T>(cmd: string, args?: unknown): Promise<T> {
     case "recalculate_data":
       if (e2e) e2eVariant = "recalculated";
       return createDemoRecalculationResult(getE2eSnapshot()) as unknown as T;
+    case "preview_recalculation": return getE2eRecalculationPreview() as unknown as T;
     case "get_audit_report":
       return DEMO_AUDIT_REPORT as unknown as T;
     case "export_audit_report":
