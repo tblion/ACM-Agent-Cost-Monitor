@@ -104,7 +104,7 @@ export function normalizeSource(source) {
     if (!rate || typeof rate !== "object" || Array.isArray(rate)) {
       throw new Error(`rates[${index}] must be an object`);
     }
-    return {
+    const normalized = {
       provider: requireText(rate.provider, `rates[${index}].provider`),
       model: requireText(rate.model, `rates[${index}].model`),
       effectiveFrom: requireDate(rate.effectiveFrom, `rates[${index}].effectiveFrom`),
@@ -114,6 +114,22 @@ export function normalizeSource(source) {
       cacheWrite: requirePrice(rate.cacheWrite, `rates[${index}].cacheWrite`),
       source: requireText(rate.source, `rates[${index}].source`),
     };
+    if (rate.contextThresholdTokens !== undefined || rate.aboveContext !== undefined) {
+      if (!Number.isSafeInteger(rate.contextThresholdTokens) || rate.contextThresholdTokens <= 0) {
+        throw new Error(`rates[${index}].contextThresholdTokens must be a positive safe integer`);
+      }
+      if (!rate.aboveContext || typeof rate.aboveContext !== "object" || Array.isArray(rate.aboveContext)) {
+        throw new Error(`rates[${index}].aboveContext must be an object`);
+      }
+      normalized.contextThresholdTokens = rate.contextThresholdTokens;
+      normalized.aboveContext = {
+        input: requirePrice(rate.aboveContext.input, `rates[${index}].aboveContext.input`),
+        output: requirePrice(rate.aboveContext.output, `rates[${index}].aboveContext.output`),
+        cacheRead: requirePrice(rate.aboveContext.cacheRead, `rates[${index}].aboveContext.cacheRead`),
+        cacheWrite: requirePrice(rate.aboveContext.cacheWrite, `rates[${index}].aboveContext.cacheWrite`),
+      };
+    }
+    return normalized;
   });
 
   rates.sort((left, right) => left.provider.localeCompare(right.provider)
