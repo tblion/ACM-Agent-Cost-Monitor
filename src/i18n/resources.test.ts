@@ -143,6 +143,7 @@ describe("i18n foundation", () => {
 
   it("starts i18next with the translation namespace ready", async () => {
     await i18nReady;
+    await i18n.changeLanguage("en");
     expect(i18n.isInitialized).toBe(true);
     expect(i18n.t("header.settings")).toBe("⚙ Settings");
   });
