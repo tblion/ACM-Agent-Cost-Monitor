@@ -1,10 +1,10 @@
 // Displays usage pricing and lets users explicitly recalculate historical costs.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogStatus, CostSummary, RateEntry, RecalculationDiagnostics, RecalculationResult, SessionRecord } from "../types";
 import type { AppDataSource } from "../data-source";
 import { isConfiguredRate, rateKey } from "../lib/rates";
 import { useTranslation } from "react-i18next";
-import { formatCurrency, formatNumber } from "../i18n/format";
+import { formatCurrency, formatDate, formatNumber } from "../i18n/format";
 import { resolveLanguage } from "../i18n/locale";
 import { translateApiError } from "../api";
 import { PricingComparison } from "./pricing/PricingComparison";
@@ -22,6 +22,7 @@ export function RatesSection({ dataSource, currentSessions, onRecalculationStart
   const language = resolveLanguage(i18n.language);
   const [rates, setRates] = useState<RateEntry[]>([]);
   const [search, setSearch] = useState("");
+  const [expandedRate, setExpandedRate] = useState<string | null>(null);
   const [costSummary, setCostSummary] = useState<CostSummary[]>([]);
   const [ratesLoading, setRatesLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -152,7 +153,7 @@ export function RatesSection({ dataSource, currentSessions, onRecalculationStart
 
         <section aria-labelledby="configured-rates-title">
            <h3 id="configured-rates-title" style={{ fontSize: 14, margin: "0 0 8px" }}>{t("rates.availableTitle")}</h3>
-           <p id="usage-rate-help" style={{ color: "var(--muted)", fontSize: 12 }}>{t("rates.rateDetails")}</p>
+            <p id="usage-rate-help" style={{ color: "var(--muted)", fontSize: 12 }}>{t("rates.rateDetails")}</p>
            <label htmlFor="usage-rate-search" style={{ display: "block", marginBottom: 8 }}>{t("rates.searchLabel")}</label>
            <input id="usage-rate-search" type="search" value={search} onChange={event => setSearch(event.target.value)} aria-describedby="usage-rate-help" placeholder={t("rates.searchPlaceholder")} />
            {(ratesLoading || !sourceIsCurrent) && <p role="status" style={{ color: "var(--muted)", fontSize: 13 }}>{t("rates.configuredLoading")}</p>}
@@ -163,33 +164,37 @@ export function RatesSection({ dataSource, currentSessions, onRecalculationStart
            {sourceIsCurrent && !ratesLoading && !ratesError && search.trim().length > 0 && filteredRates.length === 0 && <p role="status">{t("rates.noSearchResults")}</p>}
            {sourceIsCurrent && !ratesLoading && !ratesError && filteredRates.length > 0 && (
              <div className="rates-table-scroll" role="region" tabIndex={0} aria-label={t("rates.ratesRegion")}>
-            <table style={{ minWidth: 760, width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <caption style={{ textAlign: "left", paddingBottom: 6 }}>{t("rates.availableCaption")}</caption>
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.provider")}</th>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.model")}</th>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.inputRate")}</th>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.outputRate")}</th>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.cacheRead")}</th>
-                 <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500, textAlign: "right" }}>{t("rates.cacheWrite")}</th>
-                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.source")}</th>
-                  <th scope="col" style={{ padding: "6px 10px", color: "var(--muted)", fontWeight: 500 }}>{t("rates.effectiveFrom")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRates.map((r, i) => (
-                <tr key={`${r.provider}:${r.model}:${r.effectiveFrom ?? "unknown"}:${i}`} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td style={{ padding: "7px 10px" }}>{r.provider}</td>
-                  <td style={{ padding: "7px 10px", fontFamily: "monospace" }}>{r.model}</td>
-                  <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.input)}</td>
-                  <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.output)}</td>
-                  <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.cacheRead)}</td>
-                  <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtRate(r.cacheWrite)}</td>
-                    <td style={{ padding: "7px 10px" }}><span className="badge">{t(r.source === "configured" ? "rates.configuredSource" : "rates.catalogSource")}</span></td>
-                    <td style={{ padding: "7px 10px" }}>{r.effectiveFrom ?? t("rates.currentRate")}</td>
-                </tr>
-              ))}
+              <table className="rates-table">
+               <caption style={{ textAlign: "left", paddingBottom: 6 }}>{t("rates.availableCaption")}</caption>
+             <thead>
+               <tr>
+                  <th scope="col">{t("rates.model")}</th>
+                  <th scope="col" className="rates-number-heading">{t("rates.inputRate")}</th>
+                  <th scope="col" className="rates-number-heading">{t("rates.outputRate")}</th>
+                  <th scope="col" className="rates-number-heading"><span>{t("rates.cacheRates")}</span><small>{t("rates.cacheRead")} / {t("rates.cacheWrite")}</small></th>
+                  <th scope="col">{t("rates.source")}</th>
+                  <th scope="col"><span className="sr-only">{t("rates.rateActions")}</span></th>
+               </tr>
+             </thead>
+             <tbody>
+               {filteredRates.map((r, i) => (
+                 (() => {
+                   const rateId = `${r.provider}:${r.model}:${r.effectiveFrom ?? "unknown"}:${i}`;
+                   const detailsId = `rate-details-${i}`;
+                   const isExpanded = expandedRate === rateId;
+                   return <Fragment key={rateId}>
+                     <tr className="rates-data-row">
+                       <td><div className="rate-model"><span className="rate-provider-icon" aria-hidden="true">{r.provider.slice(0, 1).toLocaleUpperCase(language)}</span><span><strong>{r.model}</strong><small>{r.provider}</small></span></div></td>
+                       <td className="rates-number">{fmtRate(r.input)}</td>
+                       <td className="rates-number">{fmtRate(r.output)}</td>
+                       <td className="rates-number rates-cache-values"><span>{fmtRate(r.cacheRead)}</span><span aria-hidden="true">/</span><span>{fmtRate(r.cacheWrite)}</span></td>
+                       <td><span className="badge">{t(r.source === "configured" ? "rates.configuredSource" : "rates.catalogSource")}</span></td>
+                       <td className="rates-actions"><button type="button" className="rates-disclosure" aria-label={t(isExpanded ? "rates.hideDetails" : "rates.showDetails", { model: r.model })} aria-expanded={isExpanded} aria-controls={detailsId} onClick={() => setExpandedRate(isExpanded ? null : rateId)}>{isExpanded ? "⌃" : "⌄"}</button></td>
+                     </tr>
+                     {isExpanded && <tr id={detailsId} className="rates-details-row"><td colSpan={6}><span className="rates-details-label">{t("rates.effectiveFrom")}</span><span>{r.effectiveFrom ? formatDate(new Date(`${r.effectiveFrom}T12:00:00Z`).getTime(), language) : t("rates.currentRate")}</span><span className="rates-details-label">{t("rates.cacheRead")} / {t("rates.cacheWrite")}</span><span>{fmtRate(r.cacheRead)} / {fmtRate(r.cacheWrite)}</span></td></tr>}
+                   </Fragment>;
+                 })()
+               ))}
             </tbody>
           </table>
             </div>

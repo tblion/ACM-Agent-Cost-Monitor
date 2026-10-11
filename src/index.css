@@ -41,6 +41,33 @@ button:disabled, input:disabled, select:disabled {
 }
 .badge { display: inline-block; padding: 2px 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; white-space: nowrap; }
 .rates-table-scroll { max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.rates-table { width: 100%; min-width: 650px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.rates-table caption { padding: 0 0 8px; color: var(--muted); font-size: 11px; }
+.rates-table th { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--muted); background: color-mix(in srgb, var(--panel) 86%, var(--bg)); font-size: 10px; font-weight: 650; text-align: left; }
+.rates-table th:first-child { border-radius: var(--radius) 0 0 0; }
+.rates-table th:last-child { border-radius: 0 var(--radius) 0 0; }
+.rates-table th small { display: block; margin-top: 2px; font-size: 9px; font-weight: 400; }
+.rates-table .rates-number-heading, .rates-table .rates-number { text-align: right; white-space: nowrap; }
+.rates-data-row td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.rates-data-row:hover { background: color-mix(in srgb, var(--accent) 5%, var(--panel)); }
+.rate-model { display: flex; align-items: center; gap: 9px; min-width: 190px; }
+.rate-provider-icon { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); color: var(--accent); font-size: 11px; font-weight: 700; }
+.rate-model strong { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 600; }
+.rate-model small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+.rates-cache-values { white-space: nowrap; }
+.rates-cache-values span { margin-inline: 2px; }
+.rates-actions { width: 42px; text-align: right; }
+.catalog-rates-scroll { margin-block: 14px; }
+.catalog-rates-table { min-width: 690px; }
+.catalog-rates-table .rates-actions { width: 82px; }
+.catalog-rate-actions { display: flex; justify-content: flex-end; gap: 2px; }
+.catalog-rate-edit { color: var(--accent); font-size: 14px; }
+.rates-disclosure { display: inline-grid; width: 36px; height: 36px; place-items: center; border: 1px solid transparent; border-radius: var(--radius); color: var(--muted); font-size: 16px; cursor: pointer; }
+.rates-disclosure:hover { border-color: var(--border); color: var(--text); }
+.rates-details-row td { padding: 10px 14px 11px 47px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent) 5%, var(--panel)); font-size: 11px; }
+.rates-details-label { margin-right: 7px; color: var(--muted); font-weight: 600; }
+.rates-details-label:not(:first-child) { margin-left: 18px; }
+.rates-details-row td > span + span { font-variant-numeric: tabular-nums; }
 .pricing-comparison { display: grid; gap: 14px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
 .pricing-comparison-heading, .pricing-source header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .pricing-comparison-heading { justify-content: space-between; }

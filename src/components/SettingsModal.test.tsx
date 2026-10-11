@@ -12,6 +12,16 @@ import { SettingsModal } from "./SettingsModal";
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("../api", () => ({
+  getCatalogRates: vi.fn().mockResolvedValue([{
+    provider: "OpenAI",
+    model: "gpt-6-luna",
+    input: 0.1,
+    output: 0.5,
+    cacheRead: 0.01,
+    cacheWrite: 0.13,
+    effectiveFrom: "2026-10-11",
+    source: "catalog",
+  }]),
   getResolvedPaths: vi.fn().mockResolvedValue({ db: "/db", config: "/config" }),
   getInternalStoreStatus: vi.fn().mockResolvedValue({ databasePath: "/store.sqlite", projects: 1, sessions: 2, messages: 3, sources: 1, lastImportedAt: null }),
   getInternalStoreSources: vi.fn().mockResolvedValue([]),
@@ -65,6 +75,13 @@ async function renderModal(customGroups: Settings["customGroups"], onSave = vi.f
     container.querySelector<HTMLButtonElement>('[data-section="projects"]')?.click();
   });
   return container;
+}
+
+async function openRates(container: HTMLElement): Promise<void> {
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-section="rates"]')?.click();
+    await Promise.resolve();
+  });
 }
 
 async function save(container: HTMLElement): Promise<void> {
@@ -148,5 +165,27 @@ describe("SettingsModal project groups", () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       customGroups: [{ name: "Second", projects: ["/workspace/active"] }],
     }));
+  });
+});
+
+describe("SettingsModal catalog rates", () => {
+  it("shows compact catalog rows and expands rate provenance on demand", async () => {
+    const container = await renderModal([]);
+    await openRates(container);
+
+    expect(container.querySelector(".catalog-rates-table")).not.toBeNull();
+    expect(container.textContent).toContain("gpt-6-luna");
+    expect(container.textContent).not.toContain("Date d’effet : 11/10/2026");
+
+    const details = container.querySelector<HTMLButtonElement>('button[aria-label="Afficher les détails de OpenAI/gpt-6-luna"]');
+    expect(details?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => { details?.click(); });
+
+    expect(details?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("Date d’effet: 11/10/2026");
+    const customize = container.querySelector<HTMLButtonElement>('button[aria-label="Personnaliser le tarif catalogue de OpenAI/gpt-6-luna"]');
+    expect(customize).not.toBeNull();
+    await act(async () => { customize?.click(); });
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Identifiant exact du modèle"]')?.value).toBe("gpt-6-luna");
   });
 });

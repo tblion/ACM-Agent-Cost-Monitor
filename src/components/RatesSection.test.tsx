@@ -59,6 +59,33 @@ afterEach(async () => {
 });
 
 describe("RatesSection recalculation preview", () => {
+  it("keeps rate details collapsed until the row is expanded", async () => {
+    const source = createSource({ getRates: vi.fn().mockResolvedValue([{
+      provider: "OpenAI",
+      model: "gpt-6-luna",
+      input: 0.1,
+      output: 0.5,
+      cacheRead: 0.01,
+      cacheWrite: 0.13,
+      source: "catalog",
+      effectiveFrom: "2026-10-11",
+    }]) });
+    const container = await renderSection(source);
+
+    const detailsButton = container.querySelector<HTMLButtonElement>('button[aria-label="Afficher les détails de gpt-6-luna"]');
+    expect(detailsButton).not.toBeNull();
+    expect(detailsButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).not.toContain("Date d’effet");
+
+    await act(async () => { detailsButton?.click(); });
+
+    expect(detailsButton?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("Date d’effet");
+    expect(container.textContent).toContain("11/10/2026");
+    expect(container.textContent).toContain("0,01");
+    expect(container.textContent).toContain("0,13");
+  });
+
   it("shows the impact without changing displayed data until the user confirms", async () => {
     const source = createSource();
     const onDataRecalculated = vi.fn();

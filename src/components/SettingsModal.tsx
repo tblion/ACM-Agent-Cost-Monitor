@@ -1,10 +1,11 @@
 // Edits application preferences, data mode, and live monitoring settings.
-import { useState, useEffect, useMemo, useRef, type FormEvent, type RefObject } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef, type FormEvent, type RefObject } from "react";
 import type { Settings, CustomGroup, BackendLogEntry, InternalStoreStatus, InternalStoreSource, ResolvedPaths, SessionRecord, ConfiguredRateVersion } from "../types";
 import { getCatalogRates, pickPath, getResolvedPaths, getInternalStoreStatus, getInternalStoreSources, refreshInternalStoreSource, refreshOpenCodeApi, reimportAllSources, exportInternalStore, mergeInternalStore, getBackendLogs, onBackendLog, translateApiError } from "../api";
 import type { DataMode } from "../data-source";
 import { useTranslation } from "react-i18next";
-import { parseLanguage } from "../i18n/locale";
+import { formatDate } from "../i18n/format";
+import { parseLanguage, resolveLanguage } from "../i18n/locale";
 import { ProjectGroupPicker } from "./ProjectGroupPicker";
 import { RatesSection } from "./RatesSection";
 import { SubscriptionComparison } from "./pricing/SubscriptionComparison";
@@ -41,7 +42,8 @@ interface RateDraft {
 }
 
 export function SettingsModal({ settings, projects, dataMode, onDataModeChange, onClose, onSave, onStoreChanged, onOpenAudit, dataSource, currentSessions, onRecalculationStart, onDataRecalculated, onRecalculationError, auditButtonRef, hidden = false }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = resolveLanguage(i18n.language);
   const [s, setS] = useState<Settings>({
     ...settings,
     customGroups: settings.customGroups.map(g => ({ ...g })),
@@ -51,6 +53,7 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
   const [groups, setGroups] = useState<CustomGroup[]>(s.customGroups);
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const [pricingView, setPricingView] = useState<PricingView>("usage");
+  const [expandedCatalogRate, setExpandedCatalogRate] = useState<string | null>(null);
   const [rateDraft, setRateDraft] = useState<RateDraft | null>(null);
   const [rateError, setRateError] = useState<string | null>(null);
   const [catalogRates, setCatalogRates] = useState<Awaited<ReturnType<typeof getCatalogRates>>>([]);
@@ -514,11 +517,39 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
                  }}>{t("settings.restoreCatalogRate")}</button>}
                </article>;
              })}
-             {catalogRates.filter(rate => rate.source === "catalog").map(rate => <article key={`catalog:${rate.provider}:${rate.model}`} className="catalog-rate-entry" style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 10, marginBottom: 10 }}>
-               <strong>{rate.provider}/{rate.model}</strong>
-               <p>{t("settings.catalogReference")}: input {rate.input} · output {rate.output} · cache read {rate.cacheRead} · cache write {rate.cacheWrite} · {rate.effectiveFrom ?? t("rates.currentRate")}</p>
-               <button type="button" aria-label={t("settings.customizeCatalogRate", { provider: rate.provider, model: rate.model })} onClick={() => editCustomRate(rate)}>{t("settings.customizeCatalogRateAction")}</button>
-             </article>)}
+              {catalogRates.some(rate => rate.source === "catalog") && <div className="rates-table-scroll catalog-rates-scroll" role="region" tabIndex={0} aria-label={t("settings.catalogRatesRegion")}>
+                <table className="rates-table catalog-rates-table">
+                  <caption>{t("settings.catalogRatesCaption")}</caption>
+                  <thead><tr>
+                    <th scope="col">{t("rates.model")}</th>
+                    <th scope="col" className="rates-number-heading">{t("rates.inputRate")}</th>
+                    <th scope="col" className="rates-number-heading">{t("rates.outputRate")}</th>
+                    <th scope="col" className="rates-number-heading">{t("rates.cacheRates")}<small>{t("rates.cacheRead")} / {t("rates.cacheWrite")}</small></th>
+                    <th scope="col">{t("rates.source")}</th>
+                    <th scope="col"><span className="sr-only">{t("rates.rateActions")}</span></th>
+                  </tr></thead>
+                  <tbody>{catalogRates.filter(rate => rate.source === "catalog").map((rate, index) => {
+                    const rateId = `${rate.provider}:${rate.model}`;
+                    const detailsId = `catalog-rate-details-${index}`;
+                    const isExpanded = expandedCatalogRate === rateId;
+                    const showPrice = (value: number) => `${new Intl.NumberFormat(language, { maximumFractionDigits: 6 }).format(value)} ${t("rates.rateUnit")}`;
+                    return <Fragment key={rateId}>
+                      <tr className="rates-data-row catalog-rate-entry">
+                        <td><div className="rate-model"><span className="rate-provider-icon" aria-hidden="true">{rate.provider.slice(0, 1).toLocaleUpperCase(language)}</span><span><strong>{rate.model}</strong><small>{rate.provider}</small></span></div></td>
+                        <td className="rates-number">{showPrice(rate.input)}</td>
+                        <td className="rates-number">{showPrice(rate.output)}</td>
+                        <td className="rates-number rates-cache-values"><span>{showPrice(rate.cacheRead)}</span><span aria-hidden="true">/</span><span>{showPrice(rate.cacheWrite)}</span></td>
+                        <td><span className="badge">{t("rates.catalogSource")}</span></td>
+                        <td className="rates-actions"><div className="catalog-rate-actions">
+                          <button type="button" className="rates-disclosure" aria-label={t(isExpanded ? "rates.hideDetails" : "rates.showDetails", { model: `${rate.provider}/${rate.model}` })} aria-expanded={isExpanded} aria-controls={detailsId} onClick={() => setExpandedCatalogRate(isExpanded ? null : rateId)}>{isExpanded ? "⌃" : "⌄"}</button>
+                          <button type="button" className="rates-disclosure catalog-rate-edit" title={t("settings.customizeCatalogRateAction")} aria-label={t("settings.customizeCatalogRate", { provider: rate.provider, model: rate.model })} onClick={() => editCustomRate(rate)}>✎</button>
+                        </div></td>
+                      </tr>
+                      {isExpanded && <tr id={detailsId} className="rates-details-row"><td colSpan={6}><span className="rates-details-label">{t("settings.catalogReference")}</span><span>{t("rates.effectiveFrom")}: {rate.effectiveFrom ? formatDate(new Date(`${rate.effectiveFrom}T12:00:00Z`).getTime(), language) : t("rates.currentRate")}</span><span className="rates-details-label">{t("rates.cacheRead")} / {t("rates.cacheWrite")}</span><span>{showPrice(rate.cacheRead)} / {showPrice(rate.cacheWrite)}</span></td></tr>}
+                    </Fragment>;
+                  })}</tbody>
+                </table>
+              </div>}
              <button type="button" onClick={() => editCustomRate()}>{t("settings.addCustomRate")}</button>
              {rateDraft && <form onSubmit={saveCustomRateVersion} aria-label={t("settings.customRateForm")}>
                <fieldset style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 12, padding: 10 }}>
