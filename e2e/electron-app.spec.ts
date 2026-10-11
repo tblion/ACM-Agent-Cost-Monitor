@@ -31,9 +31,55 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 let electronApp: ElectronApplication | undefined;
 let page: Page | undefined;
 let fixture: ElectronFixture | undefined;
+let pricingSourceServer: ReturnType<typeof createServer> | undefined;
+let pricingSourceRequests: Array<{ method: string | undefined; url: string | undefined }> = [];
 
 test.beforeEach(async () => {
-  fixture = await createFixture();
+  fixture = await createFixture(test.info().title === "applies GPT-6 Luna context pricing tiers");
+  if (test.info().title === "loads legacy subscriptions and defaults versioned custom rates") {
+    const settingsDirectory = path.join(fixture.root, "settings");
+    await mkdir(settingsDirectory, { recursive: true });
+    await writeFile(path.join(settingsDirectory, "settings.json"), JSON.stringify({
+      fixedSubscriptions: [{
+        provider: "legacy-provider",
+        amount: 42,
+        period: "monthly",
+        models: ["legacy-model"],
+        effectiveFrom: "2026-01-01",
+        effectiveTo: null,
+      }],
+    }), "utf8");
+  }
+  if (test.info().title === "uses versioned custom pricing on message dates") {
+    const settingsDirectory = path.join(fixture.root, "settings");
+    await mkdir(settingsDirectory, { recursive: true });
+    await writeFile(path.join(settingsDirectory, "settings.json"), JSON.stringify({
+      customRates: [
+        {
+          id: "fixture-rate-before-pivot",
+          provider: "fixture-provider",
+          model: "fixture-model",
+          input: 2,
+          output: 4,
+          cacheRead: 0,
+          cacheWrite: 0,
+          effectiveFrom: "2026-10-01T00:00:00Z",
+          source: "manual",
+        },
+        {
+          id: "fixture-rate-after-pivot",
+          provider: "fixture-provider",
+          model: "fixture-model",
+          input: 10,
+          output: 20,
+          cacheRead: 0,
+          cacheWrite: 0,
+          effectiveFrom: "2026-10-01T12:05:00Z",
+          source: "manual",
+        },
+      ],
+    }), "utf8");
+  }
   const inheritedEnvironmentKeys = [
     "PATH", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "WINDIR", "TEMP", "TMP",
     "DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "DBUS_SESSION_BUS_ADDRESS", "LANG", "LC_ALL",
@@ -51,6 +97,38 @@ test.beforeEach(async () => {
     OPENCODE_COSTS_VIEWER_SETTINGS_DIR: path.join(fixture.root, "settings"),
     ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
   });
+  if (test.info().title.startsWith("pricing source comparison")) {
+    pricingSourceRequests = [];
+    pricingSourceServer = createServer((request, response) => {
+      pricingSourceRequests.push({ method: request.method, url: request.url });
+      response.setHeader("content-type", "application/json");
+      if (request.url === "/official") {
+        response.end(JSON.stringify({
+          candidates: [{ provider: "openai", model: "fixture-model", input: 2, output: 8, cacheRead: 0, cacheWrite: 0, currency: "USD", unit: "per_million_tokens", effectiveFrom: "2026-10-01" }],
+        }));
+      } else if (request.url === "/aggregator") {
+        response.end(JSON.stringify({
+          "fixture-model": { litellm_provider: "openai", input_cost_per_token: 0.000002, output_cost_per_token: 0.000008, cache_read_input_token_cost: null, cache_creation_input_token_cost: null },
+          "fixture-model-preview": { litellm_provider: "openai", input_cost_per_token: 0.000003, output_cost_per_token: 0.000009 },
+        }));
+      } else if (request.url === "/subscription") {
+        response.end(JSON.stringify({ candidates: [{ model: "Plus", amount: 20, currency: "USD", unit: "monthly", region: null }] }));
+      } else {
+        response.statusCode = 503;
+        response.end("source unavailable");
+      }
+    });
+    await new Promise<void>(resolve => pricingSourceServer!.listen(0, "127.0.0.1", resolve));
+    const address = pricingSourceServer.address() as AddressInfo;
+    const pricingSourceServerUrl = `http://127.0.0.1:${address.port}`;
+    Object.assign(environment, {
+      OPENCODE_COSTS_PRICING_OFFICIAL_URL: `${pricingSourceServerUrl}/official`,
+      OPENCODE_COSTS_PRICING_AGGREGATOR_URL: `${pricingSourceServerUrl}/aggregator`,
+      OPENCODE_COSTS_PRICING_FAILED_SOURCE_URL: `${pricingSourceServerUrl}/failed`,
+      OPENCODE_COSTS_PRICING_SUBSCRIPTION_URL: `${pricingSourceServerUrl}/subscription`,
+      OPENCODE_COSTS_PRICING_E2E: "true",
+    });
+  }
   delete environment.VITE_DEV_SERVER_URL;
   delete environment.VITE_OPENCODE_MOCK;
 
@@ -88,10 +166,52 @@ test.afterEach(async () => {
   } catch (error) {
     cleanupError ??= error;
   }
+  try {
+    if (pricingSourceServer) await new Promise<void>((resolve, reject) => pricingSourceServer!.close(error => error ? reject(error) : resolve()));
+  } catch (error) {
+    cleanupError ??= error;
+  }
   electronApp = undefined;
   page = undefined;
   fixture = undefined;
+  pricingSourceServer = undefined;
+  pricingSourceRequests = [];
   if (cleanupError) throw cleanupError;
+});
+
+test("pricing source comparison isolates failures and rejects approximate model matches", async () => {
+  const result = await page!.evaluate(async () => {
+    const api = window.desktopApi as unknown as {
+      getPricingCandidates(keys: unknown[]): Promise<{ sources: Array<{ sourceId: string; status: string; candidates: Array<{ model: string; matchStatus: string; input: number | null }> }> }>;
+    };
+    return api.getPricingCandidates([
+      { kind: "usage", provider: "openai", model: "fixture-model" },
+      { kind: "usage", provider: "openai", model: "fixture-model-pre" },
+    ]);
+  });
+  expect(result.sources.find(source => source.sourceId === "openai-official")?.candidates)
+    .toEqual([expect.objectContaining({ model: "fixture-model", matchStatus: "exact", input: 2 })]);
+  expect(result.sources.find(source => source.sourceId === "litellm")?.candidates)
+    .toEqual(expect.arrayContaining([
+      expect.objectContaining({ model: "fixture-model", matchStatus: "exact", input: 2 }),
+      expect.objectContaining({ model: "fixture-model-preview", matchStatus: "ambiguous" }),
+    ]));
+  expect(result.sources.find(source => source.status === "error")?.sourceId).toBe("failed-source");
+  expect(pricingSourceRequests.map(request => request.method)).toEqual(["GET", "GET", "GET"]);
+  expect(pricingSourceRequests.map(request => request.url).sort()).toEqual(["/aggregator", "/failed", "/official"]);
+});
+
+test("pricing source comparison keeps public subscription prices separate from actual paid amounts", async () => {
+  const result = await page!.evaluate(async () => {
+    const api = window.desktopApi as unknown as {
+      getPricingCandidates(keys: unknown[]): Promise<{ sources: Array<{ sourceId: string; status: string; candidates: Array<{ model: string; input: number | null; currency: string; unit: string; region: string | null; matchStatus: string }> }> }>;
+    };
+    return api.getPricingCandidates([{ kind: "subscription", provider: "openai", model: "Plus" }]);
+  });
+  const candidate = result.sources.find(source => source.sourceId === "openai-subscription")?.candidates[0];
+  expect(candidate).toMatchObject({ model: "Plus", input: 20, currency: "USD", unit: "monthly", region: null, matchStatus: "ambiguous" });
+  expect(result.sources.find(source => source.sourceId === "openai-subscription")?.status).toBe("available");
+  expect(pricingSourceRequests.map(request => request.url).sort()).toEqual(["/failed", "/subscription"]);
 });
 
 test("uses the real read-only SQLite backend for costs, rates, summary, audit, and settings", async () => {
@@ -164,12 +284,13 @@ test("uses the real read-only SQLite backend for costs, rates, summary, audit, a
   await expect(sourcesPopover).toContainText("API OpenCode");
   await expect(sourcesPopover).not.toContainText("Tout rafraîchir");
   await page!.getByRole("button", { name: "Réglages" }).click();
-  const settingsDialog = page!.getByRole("dialog");
-  await expect(settingsDialog).toContainText("Intégrations");
-  await expect(settingsDialog).toContainText("Base de données");
-  await expect(settingsDialog).toContainText("API OpenCode");
-  await expect(settingsDialog).toContainText("toutes les 30 secondes");
-  await settingsDialog.getByRole("button", { name: "Fermer les réglages" }).click();
+  const settingsPage = page!.locator(".settings-page");
+  await settingsPage.getByRole("button", { name: "Sources et données" }).click();
+  await expect(settingsPage).toContainText("Intégrations");
+  await expect(settingsPage).toContainText("Base de données");
+  await expect(settingsPage).toContainText("API OpenCode");
+  await expect(settingsPage).toContainText("toutes les 30 secondes");
+  await settingsPage.getByRole("button", { name: "Retour au tableau de bord" }).click();
 
   const settings = await page!.evaluate(async () => window.desktopApi!.getSettings());
   const settingsStatus = await page!.evaluate(async () => window.desktopApi!.getSettingsStatus());
@@ -188,6 +309,157 @@ test("uses the real read-only SQLite backend for costs, rates, summary, audit, a
 
   const currentDatabaseHash = createHash("sha256").update(await readFile(fixture!.databasePath)).digest("hex");
   expect(currentDatabaseHash).toBe(fixture!.databaseHash);
+});
+
+test("applies GPT-6 Luna context pricing tiers", async () => {
+  const sessions = await page!.evaluate(async () => window.desktopApi!.getData());
+  expect(sessions.find((session: SessionRecord) => session.title === "GPT-6 Luna short context")?.cost)
+    .toBeCloseTo(0.0272, 10);
+  expect(sessions.find((session: SessionRecord) => session.title === "GPT-6 Luna long context")?.cost)
+    .toBeCloseTo(0.0544002, 10);
+  expect(sessions.find((session: SessionRecord) => session.title === "GPT-6 Luna yesterday")?.cost)
+    .toBeCloseTo(0.2, 10);
+
+  const audit = await page!.evaluate(async () => window.desktopApi!.getAuditReport());
+  expect(audit.valid).toBe(true);
+});
+
+test("adds fixed subscriptions separately and zeroes covered model usage", async () => {
+  await page!.getByRole("button", { name: "Réglages" }).click();
+  const settingsPage = page!.locator(".settings-page");
+  await settingsPage.getByRole("button", { name: "Tarifs" }).click();
+  await settingsPage.getByRole("button", { name: "Abonnements" }).click();
+  await settingsPage.getByRole("button", { name: "+ Ajouter un forfait" }).click();
+  await settingsPage.locator("#subscription-0-provider").fill("fixture-provider");
+  await settingsPage.locator("#subscription-0-amount").fill("120");
+  await settingsPage.locator("#subscription-0-period").selectOption("annual");
+  await settingsPage.locator("#subscription-0-from").fill("2026-10-01");
+  await settingsPage.locator("#subscription-0-models").fill("fixture-model");
+  await settingsPage.getByRole("button", { name: "Enregistrer" }).click();
+  await expect.poll(async () => page!.evaluate(async () => (await window.desktopApi!.getSettings()).fixedSubscriptions.length)).toBe(1);
+
+  const sessions = await page!.evaluate(async () => window.desktopApi!.getData());
+  expect(sessions.find((session: SessionRecord) => session.title === "Native fixture parent")?.cost).toBe(0);
+  expect(sessions.find((session: SessionRecord) => session.title === "Native fixture child")?.cost).toBe(0);
+  expect(sessions.find((session: SessionRecord) => session.title === "Native stored fallback")?.cost).toBe(0.75);
+
+  const totalCostCard = page!.locator(".kpi-grid .panel").first();
+  await expect(totalCostCard).toContainText("Forfaits fixes (hors sessions)");
+  await expect(totalCostCard).toContainText("10,00");
+  await expect(totalCostCard).toContainText("10,75");
+});
+
+test("loads legacy subscriptions and defaults versioned custom rates", async () => {
+  const settings = await page!.evaluate(async () => window.desktopApi!.getSettings());
+  expect(settings.fixedSubscriptions).toEqual([expect.objectContaining({
+    provider: "legacy-provider",
+    amount: 42,
+    period: "monthly",
+    models: ["legacy-model"],
+    effectiveFrom: "2026-01-01",
+    effectiveTo: null,
+  })]);
+  expect((settings as typeof settings & { customRates?: unknown[] }).customRates).toEqual([]);
+
+  const legacySubscriptionId = (settings.fixedSubscriptions[0] as typeof settings.fixedSubscriptions[number] & { id?: string }).id;
+  expect(legacySubscriptionId).toBeTruthy();
+  await page!.evaluate(async value => window.desktopApi!.saveSettings(value), settings);
+  let saved = await page!.evaluate(async () => window.desktopApi!.getSettings());
+  expect((saved.fixedSubscriptions[0] as typeof saved.fixedSubscriptions[number] & { id?: string }).id)
+    .toBe(legacySubscriptionId);
+
+  const customRate = {
+    id: "legacy-model-rate-2026",
+    provider: "legacy-provider",
+    model: "legacy-model",
+    input: 0.25,
+    output: 1.5,
+    cacheRead: 0.1,
+    cacheWrite: 0.3,
+    effectiveFrom: "2026-01-01T00:00:00Z",
+    source: "manual",
+  };
+  await page!.evaluate(async ({ value, rate }) => window.desktopApi!.saveSettings({ ...value, customRates: [rate] }), {
+    value: settings,
+    rate: customRate,
+  });
+  saved = await page!.evaluate(async () => window.desktopApi!.getSettings());
+  expect(saved.customRates).toEqual([customRate]);
+
+  const invalidRates = {
+    ...saved,
+    customRates: [{
+      id: "invalid-rate",
+      provider: "legacy-provider",
+      model: "legacy-model",
+      input: -1,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      effectiveFrom: "2026-01-01T00:00:00Z",
+      source: "manual",
+    }],
+  };
+  await expect(page!.evaluate(async value => window.desktopApi!.saveSettings(value), invalidRates)).rejects.toThrow();
+});
+
+test("uses versioned custom pricing on message dates", async () => {
+  const sessions = await page!.evaluate(async () => window.desktopApi!.getData());
+  expect(sessions.find((session: SessionRecord) => session.title === "Native fixture parent")?.cost).toBeCloseTo(4.04, 10);
+  expect(sessions.find((session: SessionRecord) => session.title === "Native fixture child")?.cost).toBeCloseTo(1, 10);
+
+  const rates = await page!.evaluate(async () => window.desktopApi!.getRates());
+  expect(rates).toEqual(expect.arrayContaining([
+    expect.objectContaining({ input: 2, output: 4, source: "configured", effectiveFrom: "2026-10-01T00:00:00Z" }),
+    expect.objectContaining({ input: 10, output: 20, source: "configured", effectiveFrom: "2026-10-01T12:05:00Z" }),
+  ]));
+
+  const recalculation = await page!.evaluate(async () => window.desktopApi!.recalculateData());
+  expect(recalculation.sessions.find((session: SessionRecord) => session.title === "Native fixture parent")?.cost).toBeCloseTo(4.04, 10);
+  expect(recalculation.sessions.find((session: SessionRecord) => session.title === "Native fixture child")?.cost).toBeCloseTo(1, 10);
+
+  const audit = await page!.evaluate(async () => window.desktopApi!.getAuditReport());
+  expect(audit.messages.find(message => message.messageId.endsWith("/message-configured"))?.calculatedCost).toBeCloseTo(4.04, 10);
+  expect(audit.messages.find(message => message.messageId.endsWith("/message-child"))?.calculatedCost).toBeCloseTo(1, 10);
+  expect(createHash("sha256").update(await readFile(fixture!.databasePath)).digest("hex")).toBe(fixture!.databaseHash);
+});
+
+test("historical recalculation preview computes impact without applying it", async () => {
+  const before = await page!.evaluate(async () => window.desktopApi!.getData());
+  const sourceHash = createHash("sha256").update(await readFile(fixture!.databasePath)).digest("hex");
+  const preview = await page!.evaluate(async () => {
+    const api = window.desktopApi as DesktopApi & {
+      previewRecalculation: () => Promise<{ sessions: SessionRecord[]; diagnostics: { recalculableMessages: number; missingDates: number; missingTokens: number; missingRates: number } }>;
+    };
+    return api.previewRecalculation();
+  });
+  expect(preview.sessions.length).toBeGreaterThan(0);
+  expect(preview.diagnostics.recalculableMessages).toBeGreaterThan(0);
+  expect(preview.diagnostics.missingDates).toBe(0);
+  expect(preview.diagnostics.missingTokens).toBeGreaterThan(0);
+  expect(preview.diagnostics.missingRates).toBeGreaterThan(0);
+
+  const after = await page!.evaluate(async () => window.desktopApi!.getData());
+  expect(after).toEqual(before);
+
+  await page!.getByRole("button", { name: /Réglages/ }).click();
+  const settingsPage = page!.locator(".settings-page");
+  await settingsPage.getByRole("button", { name: "Tarifs" }).click();
+  await settingsPage.getByRole("button", { name: "Tarifs à l’usage" }).click();
+  await settingsPage.getByRole("button", { name: "Prévisualiser le recalcul" }).click();
+  await expect(settingsPage.getByRole("heading", { name: "Aperçu du recalcul historique" })).toBeVisible();
+  await expect(settingsPage).toContainText("Coût affiché actuellement");
+  await expect(settingsPage).toContainText("Coût estimé après recalcul");
+  await settingsPage.getByRole("button", { name: "Annuler l’aperçu" }).click();
+  expect(await page!.evaluate(async () => window.desktopApi!.getData())).toEqual(before);
+
+  await settingsPage.getByRole("button", { name: "Prévisualiser le recalcul" }).click();
+  await settingsPage.getByRole("button", { name: "Confirmer le recalcul" }).click();
+  await expect(settingsPage.getByRole("status")).toContainText("Recalcul terminé pour");
+  await page!.locator(".app-sidebar").getByRole("button", { name: "Retour au tableau de bord" }).click();
+  const applied = await page!.evaluate(async () => window.desktopApi!.getData());
+  expect(applied).toEqual(preview.sessions);
+  expect(createHash("sha256").update(await readFile(fixture!.databasePath)).digest("hex")).toBe(sourceHash);
 });
 
 test("imports OpenCode V2 tables alongside legacy V1 records", async () => {
@@ -261,6 +533,8 @@ test("imports OpenCode V2 tables alongside legacy V1 records", async () => {
 test("refreshes the OpenCode V2 API channel without replacing complete database usage", async () => {
   const apiPassword = "fixture-api-secret";
   const requests: string[] = [];
+  let incrementalUpdate = false;
+  let fullReimport = false;
   const server = createServer((request, response) => {
     requests.push(request.url ?? "");
     if (request.headers.authorization !== `Basic ${Buffer.from(`opencode:${apiPassword}`).toString("base64")}`) {
@@ -270,6 +544,8 @@ test("refreshes the OpenCode V2 API channel without replacing complete database 
     response.setHeader("content-type", "application/json");
     if (request.url === "/api/session/active") {
       response.end(JSON.stringify({ data: { "session-parent": {} } }));
+    } else if (request.url === "/api/session?limit=100") {
+      response.end(JSON.stringify({ data: [{ id: "session-parent" }], cursor: { next: null } }));
     } else if (request.url === "/api/session/session-parent") {
       response.end(JSON.stringify({ data: {
         id: "session-parent",
@@ -279,15 +555,42 @@ test("refreshes the OpenCode V2 API channel without replacing complete database 
         time: { created: 1790856000000 },
         location: { directory: "/fixtures/native" },
       } }));
-    } else if (request.url === "/api/session/session-parent/message?limit=100&order=asc") {
+    } else if (request.url === "/api/session/session-parent/message?limit=100&order=desc" && incrementalUpdate && !fullReimport) {
       response.end(JSON.stringify({ data: [{
-        id: "message-configured",
+        id: "message-api-new",
         type: "assistant",
-        time: { created: 1790856000000 },
+        time: { created: 1790863200000 },
         model: { id: "fixture-model", providerID: "fixture-provider" },
-        cost: 0,
-      }], cursor: { next: "fixture-next-cursor", previous: null } }));
-    } else if (request.url === "/api/session/session-parent/message?limit=100&cursor=fixture-next-cursor") {
+        cost: 0.4,
+        tokens: { input: 200, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+      }], cursor: { next: null, previous: "fixture-previous-cursor" } }));
+    } else if (request.url === "/api/session/session-parent/message?limit=100&order=desc" && fullReimport) {
+      response.end(JSON.stringify({ data: [
+        {
+          id: "message-api-new",
+          type: "assistant",
+          time: { created: 1790863200000 },
+          model: { id: "fixture-model", providerID: "fixture-provider" },
+          cost: 0.4,
+          tokens: { input: 200, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+        {
+          id: "message-api-added",
+          type: "assistant",
+          time: { created: 1790859600000 },
+          model: { id: "fixture-model", providerID: "fixture-provider" },
+          cost: 0.3,
+          tokens: { input: 100, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+        {
+          id: "message-configured",
+          type: "assistant",
+          time: { created: 1790856000000 },
+          model: { id: "fixture-model", providerID: "fixture-provider" },
+          cost: 0,
+        },
+      ], cursor: { next: null, previous: null } }));
+    } else if (request.url === "/api/session/session-parent/message?limit=100&order=desc") {
       response.end(JSON.stringify({ data: [{
         id: "message-api-added",
         type: "assistant",
@@ -295,6 +598,14 @@ test("refreshes the OpenCode V2 API channel without replacing complete database 
         model: { id: "fixture-model", providerID: "fixture-provider" },
         cost: 0.3,
         tokens: { input: 100, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+      }], cursor: { next: "fixture-next-cursor", previous: null } }));
+    } else if (request.url === "/api/session/session-parent/message?limit=100&cursor=fixture-next-cursor") {
+      response.end(JSON.stringify({ data: [{
+        id: "message-configured",
+        type: "assistant",
+        time: { created: 1790856000000 },
+        model: { id: "fixture-model", providerID: "fixture-provider" },
+        cost: 0,
       }], cursor: { next: null, previous: "fixture-previous-cursor" } }));
     } else {
       response.writeHead(404).end();
@@ -324,6 +635,28 @@ test("refreshes the OpenCode V2 API channel without replacing complete database 
     const channels = await page!.evaluate(async () => window.desktopApi!.getInternalStoreSources());
     expect(channels.find(channel => channel.channelKey === "api")?.lastSyncError).toBeNull();
     expect(channels.find(channel => channel.channelKey === "api")?.lastImportedAt).not.toBeNull();
+
+    requests.length = 0;
+    incrementalUpdate = true;
+    await page!.evaluate(async () => window.desktopApi!.refreshOpenCodeApi());
+    expect(requests).toContain("/api/session/session-parent/message?limit=100&order=desc");
+    expect(requests).not.toContain("/api/session/session-parent/message?limit=100&cursor=fixture-next-cursor");
+    const afterIncremental = await page!.evaluate(async () => window.desktopApi!.getData());
+    const updatedParent = afterIncremental.find((session: SessionRecord) => session.id.endsWith("/session-parent"));
+    expect(updatedParent?.messages?.filter(message => message.date === 1790863200000)).toHaveLength(1);
+
+    requests.length = 0;
+    fullReimport = true;
+    const reimportResult = await page!.evaluate(async () => window.desktopApi!.reimportAllSources().then(
+      () => ({ success: true }),
+      error => ({ success: false, error: JSON.stringify(error) }),
+    ));
+    expect(reimportResult, `Full reimport result: ${JSON.stringify(reimportResult)}`).toEqual({ success: true });
+    expect(requests).toContain("/api/session?limit=100");
+    const afterFullReimport = await page!.evaluate(async () => window.desktopApi!.getData());
+    expect(afterFullReimport).toHaveLength(3);
+    const storeStatus = await page!.evaluate(async () => window.desktopApi!.getInternalStoreStatus());
+    expect(storeStatus.messages).toBe(6);
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
@@ -446,19 +779,22 @@ test("routes file dialogs and audit export through Electron main", async () => {
   await expect(readFile(exportPath, "utf8")).resolves.toBe(content);
 
   await page!.getByRole("button", { name: /Réglages|Settings/ }).click();
-  const settingsDialog = page!.getByRole("dialog");
-  await expect(settingsDialog.getByRole("heading", { name: "Base interne de l’application" })).toBeVisible();
-  await settingsDialog.getByRole("button", { name: "Voir les logs .NET" }).click();
-  const backendLog = settingsDialog.getByRole("log", { name: "Logs du backend .NET" });
+  const settingsPage = page!.locator(".settings-page");
+  await settingsPage.getByRole("button", { name: "Sources et données" }).click();
+  await expect(settingsPage.getByRole("button", { name: "Tout réimporter" })).toBeVisible();
+  await settingsPage.getByRole("button", { name: "Diagnostic et sauvegardes" }).click();
+  await expect(settingsPage.getByRole("heading", { name: "Base interne de l’application" })).toBeVisible();
+  await settingsPage.getByRole("button", { name: "Voir les logs .NET" }).click();
+  const backendLog = settingsPage.getByRole("log", { name: "Logs du backend .NET" });
   await expect(backendLog).toContainText("Backend host started");
   await page!.evaluate(async () => window.desktopApi!.getData());
   await expect(backendLog).toContainText('Processing backend operation "get_data"');
-  await settingsDialog.getByRole("button", { name: "Masquer les logs .NET" }).click();
-  await settingsDialog.getByRole("button", { name: "Exporter une sauvegarde" }).click();
-  await expect(settingsDialog.getByRole("status")).toContainText("Sauvegarde exportée");
-  await settingsDialog.getByRole("button", { name: "Fusionner une sauvegarde" }).click();
-  await expect(settingsDialog.getByRole("status")).toContainText("Fusion terminée");
-  await settingsDialog.getByRole("button", { name: "Fermer les réglages" }).click();
+  await settingsPage.getByRole("button", { name: "Masquer les logs .NET" }).click();
+  await settingsPage.getByRole("button", { name: "Exporter une sauvegarde" }).click();
+  await expect(settingsPage.getByRole("status")).toContainText("Sauvegarde exportée");
+  await settingsPage.getByRole("button", { name: "Fusionner une sauvegarde" }).click();
+  await expect(settingsPage.getByRole("status")).toContainText("Fusion terminée");
+  await settingsPage.getByRole("button", { name: "Retour au tableau de bord" }).click();
 });
 
 test("exports and merges the internal SQLite archive without duplicating records", async () => {
@@ -512,7 +848,7 @@ test("exports and merges the internal SQLite archive without duplicating records
   expect(restored.some((session: SessionRecord) => session.id.endsWith("/session-restored"))).toBe(true);
 });
 
-async function createFixture(): Promise<ElectronFixture> {
+async function createFixture(includeContextTierMessages = false): Promise<ElectronFixture> {
   const root = await mkdtemp(path.join(os.tmpdir(), "opencode-costs-electron-e2e-"));
   let sqlite: SqlJsDatabase | undefined;
   try {
@@ -534,6 +870,27 @@ async function createFixture(): Promise<ElectronFixture> {
     const database = new SQL.Database();
     sqlite = database;
     database.run(sqlSource);
+    if (includeContextTierMessages) {
+      const createdAt = Date.UTC(2026, 9, 11, 12);
+      database.run(
+        "INSERT INTO session (id, directory, title, parent_id, time_created) VALUES (?, ?, ?, NULL, ?), (?, ?, ?, NULL, ?), (?, ?, ?, NULL, ?)",
+        ["session-gpt6-short", "/fixtures/gpt6", "GPT-6 Luna short context", createdAt,
+          "session-gpt6-long", "/fixtures/gpt6", "GPT-6 Luna long context", createdAt + 1,
+          "session-gpt6-yesterday", "/fixtures/gpt6", "GPT-6 Luna yesterday", Date.UTC(2026, 9, 9, 22, 5)],
+      );
+      database.run(
+        "INSERT INTO message (id, session_id, time_created, data) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)",
+        ["message-gpt6-short", "session-gpt6-short", createdAt,
+          JSON.stringify({ role: "assistant", providerID: "openai", modelID: "gpt-6-luna", cost: 0,
+            tokens: { input: 272000, output: 0, cache: { read: 0, write: 0 }, reasoning: 0 } }),
+          "message-gpt6-long", "session-gpt6-long", createdAt + 1,
+          JSON.stringify({ role: "assistant", providerID: "openai", modelID: "gpt-6-luna", cost: 0,
+            tokens: { input: 272001, output: 0, cache: { read: 0, write: 0 }, reasoning: 0 } }),
+          "message-gpt6-yesterday", "session-gpt6-yesterday", Date.UTC(2026, 9, 9, 22, 5),
+          JSON.stringify({ role: "assistant", providerID: "openai", modelID: "gpt-6-luna", cost: 0,
+            tokens: { input: 1000000, output: 0, cache: { read: 0, write: 0 }, reasoning: 0 } })],
+      );
+    }
 
     const databasePath = path.join(databaseDirectory, "opencode.db");
     await writeFile(databasePath, Buffer.from(database.export()));

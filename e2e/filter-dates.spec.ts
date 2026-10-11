@@ -128,19 +128,23 @@ test("refreshes a selected current-month preset at local midnight", async ({ pag
 
 test("refreshes the dashboard after recalculation and marks the audit stale", async ({ page }) => {
   await page.goto("/?e2e=recalculation");
-  await page.getByRole("button", { name: "Audit des coûts" }).click();
+  await page.getByRole("button", { name: "Réglages" }).click();
+  await page.locator(".settings-page").getByRole("button", { name: "Audit des coûts" }).click();
   await page.getByRole("button", { name: "Actualiser l’audit" }).click();
   await expect(page.getByRole("heading", { name: "Résumé" })).toBeVisible();
-  await page.getByRole("button", { name: "← Retour au tableau de bord" }).click();
+  await page.getByRole("button", { name: "← Retour aux réglages" }).click();
 
-  await page.getByRole("button", { name: "Tarifs des modèles" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Recalculer les coûts" }).click();
-  await dialog.getByRole("button", { name: "Confirmer le recalcul" }).click();
+  const settingsPage = page.locator(".settings-page");
+  await settingsPage.getByRole("button", { name: "Tarifs" }).click();
+  await settingsPage.getByRole("button", { name: "Tarifs à l’usage" }).click();
+  await settingsPage.getByRole("button", { name: "Prévisualiser le recalcul" }).click();
+  await expect(settingsPage.getByRole("heading", { name: "Aperçu du recalcul historique" })).toBeVisible();
+  await settingsPage.getByRole("button", { name: "Confirmer le recalcul" }).click();
   await expect(page.getByText("Recalcul terminé pour")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "Recalculated fixture session" })).toBeVisible();
 
-  await dialog.getByRole("button", { name: "Fermer", exact: true }).click();
-  await page.getByRole("button", { name: "Audit des coûts" }).click();
+  await page.locator(".app-sidebar").getByRole("button", { name: "Retour au tableau de bord" }).click();
+  await expect(page.getByRole("cell", { name: "Recalculated fixture session" })).toBeVisible();
+  await page.getByRole("button", { name: "Réglages" }).click();
+  await page.locator(".settings-page").getByRole("button", { name: "Audit des coûts" }).click();
   await expect(page.getByText("Audit obsolète")).toBeVisible();
 });

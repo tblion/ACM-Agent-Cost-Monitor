@@ -6,7 +6,7 @@ test.describe("live mode", () => {
     await page.goto("/?e2e=live");
     const live = page.getByRole("button", { name: /Mode live|Réactiver le mode live/ });
     await page.getByRole("button", { name: "Réglages" }).click();
-    await page.getByRole("button", { name: "Fermer les réglages" }).click();
+    await page.getByRole("button", { name: "Retour au tableau de bord" }).click();
 
     const realLive = page.getByRole("button", { name: /Mode live|Réactiver le mode live/ });
     await realLive.click();
@@ -22,7 +22,7 @@ test.describe("live mode", () => {
   test("reports a translated backend error when live settings cannot be saved", async ({ page }) => {
     await page.goto("/?e2e=live-save-error");
     await page.getByRole("button", { name: "Réglages" }).click();
-    await page.getByRole("button", { name: "Fermer les réglages" }).click();
+    await page.getByRole("button", { name: "Retour au tableau de bord" }).click();
     const live = page.getByRole("button", { name: /Mode live|Réactiver le mode live/ });
     await live.click();
     await expect(page.getByRole("alert")).toContainText("Erreur du mode live");
