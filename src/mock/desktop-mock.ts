@@ -30,7 +30,10 @@ const settings: Settings = {
   defaultPeriodDays: e2eScenario === "settings-period" ? 7 : e2eScenario === "settings-period-invalid" ? 0 : 30,
   customGroups: [],
   customRates: [],
-  fixedSubscriptions: [],
+  fixedSubscriptions: e2eScenario === "subscription-comparison" ? [{
+    id: "subscription-fixture", provider: "openai", name: "Plus", amount: 30, period: "monthly",
+    models: ["gpt-4.1"], effectiveFrom: "2026-01-01", effectiveTo: null,
+  }] : [],
 };
 const demoSnapshot = generateDemoSnapshot(Date.now());
 let currentSnapshot = e2eFixtureSnapshot ?? demoSnapshot;
@@ -200,7 +203,22 @@ export async function invoke<T>(cmd: string, args?: unknown): Promise<T> {
       return { valid: true, version: 1, generatedAt: "2026-01-01T00:00:00Z", sourceVersion: "demo", rateCount: demoSnapshot.rates.length } as unknown as T;
     case "get_pricing_candidates":
       {
-        const requested = (args as { keys?: Array<{ provider: string; model: string }> } | undefined)?.keys ?? [];
+        const requested = (args as { keys?: Array<{ kind: string; provider: string; model: string }> } | undefined)?.keys ?? [];
+        if (e2eScenario === "subscription-comparison" && requested.some(key => key.kind === "subscription")) {
+          const retrievedAt = new Date().toISOString();
+          return {
+            retrievedAt,
+            sources: [{
+              sourceId: "openai-subscription", sourceType: "official", sourceName: "OpenAI (official)",
+              sourceUrl: "https://chatgpt.com/pricing/", status: "available", error: null,
+              candidates: [{ sourceId: "openai-subscription", sourceType: "official", sourceName: "OpenAI (official)",
+                sourceUrl: "https://chatgpt.com/pricing/", retrievedAt, effectiveFrom: null, provider: "openai",
+                model: "Plus", region: null, currency: "USD", unit: "monthly", input: 20, output: null,
+                cacheRead: null, cacheWrite: null, matchStatus: "ambiguous",
+                confidenceReasons: ["Official source", "Region not specified", "Taxes not specified"] }],
+            }],
+          } as unknown as T;
+        }
         const matches = requested.some(key => key.provider.toLowerCase() === "openai" && key.model === "gpt-4.1");
         if (!matches || e2eScenario !== "pricing-comparison") {
           return { retrievedAt: new Date().toISOString(), sources: [] } as unknown as T;

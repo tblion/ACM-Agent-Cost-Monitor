@@ -68,6 +68,13 @@ button:disabled, input:disabled, select:disabled {
 .pricing-confirmation-rates p { display: grid; grid-template-columns: minmax(80px, .7fr) repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .pricing-comparison dialog button, .pricing-comparison-heading button, .pricing-selection button { min-height: 40px; }
 .pricing-comparison dialog :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.subscription-comparison { display: grid; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.subscription-comparison-results { display: grid; gap: 12px; }
+.subscription-comparison-results > p { margin: 0; color: var(--muted); }
+.subscription-candidate-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.subscription-candidate-list > li { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); overflow-wrap: anywhere; }
+.subscription-candidate-list > li > span { font-size: 13px; }
+.subscription-candidate-list ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: 12px; }
 @media (max-width: 520px) { .pricing-confirmation-rates p { grid-template-columns: 1fr; } }
 .mock-banner { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 8px 20px; background: #fff3cd; border-bottom: 1px solid #b58105; color: #5c4300; font-size: 13px; }
 .mock-banner code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

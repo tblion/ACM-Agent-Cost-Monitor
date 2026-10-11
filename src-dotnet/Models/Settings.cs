@@ -29,6 +29,7 @@ public sealed class FixedSubscription
 {
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public required string Provider { get; init; }
+    public string? Name { get; init; }
     public double Amount { get; init; }
     public required string Period { get; init; }
     public List<string> Models { get; init; } = [];

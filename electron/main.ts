@@ -180,6 +180,7 @@ ipcMain.handle(IPC_CHANNELS.openExternalUrl, async (event, input: unknown) => {
     const url = new URL(input);
     const allowedHosts = new Set([
       "github.com", "developers.openai.com", "platform.claude.com", "ai.google.dev", "raw.githubusercontent.com",
+      "chatgpt.com", "claude.com", "one.google.com",
     ]);
     if (url.protocol !== "https:" || !allowedHosts.has(url.hostname) || url.username || url.password) {
       throw { code: "invalid_input", message: "External URL is not allowed." } satisfies ApiError;

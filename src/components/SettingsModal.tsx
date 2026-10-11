@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { parseLanguage } from "../i18n/locale";
 import { ProjectGroupPicker } from "./ProjectGroupPicker";
 import { RatesSection } from "./RatesSection";
+import { SubscriptionComparison } from "./pricing/SubscriptionComparison";
 import type { AppDataSource } from "../data-source";
 
 interface Props {
@@ -562,10 +563,14 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
              return (
                 <fieldset key={id} style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, margin: "0 0 12px", padding: 10, border: "1px solid var(--border)", borderRadius: 8 }}>
                  <legend style={{ padding: "0 4px", color: "var(--muted)", fontSize: 11 }}>{t("settings.subscriptionLegend", { index: index + 1 })}</legend>
-                 <label htmlFor={`${id}-provider`} style={{ display: "grid", gap: 4, color: "var(--muted)", fontSize: 11 }}>
-                   {t("settings.subscriptionProvider")}
-                    <input id={`${id}-provider`} value={subscription.provider} disabled={isPersistedVersion} onChange={event => updateSubscription({ provider: event.target.value })} style={{ minWidth: 0, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "7px 8px", color: "var(--text)" }} />
-                 </label>
+                  <label htmlFor={`${id}-provider`} style={{ display: "grid", gap: 4, color: "var(--muted)", fontSize: 11 }}>
+                    {t("settings.subscriptionProvider")}
+                     <input id={`${id}-provider`} value={subscription.provider} disabled={isPersistedVersion} onChange={event => updateSubscription({ provider: event.target.value })} style={{ minWidth: 0, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "7px 8px", color: "var(--text)" }} />
+                  </label>
+                  <label htmlFor={`${id}-name`} style={{ display: "grid", gap: 4, color: "var(--muted)", fontSize: 11 }}>
+                    {t("settings.subscriptionName")}
+                    <input id={`${id}-name`} value={subscription.name ?? ""} disabled={isPersistedVersion} placeholder={t("settings.subscriptionNamePlaceholder")} onChange={event => updateSubscription({ name: event.target.value })} style={{ minWidth: 0, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "7px 8px", color: "var(--text)" }} />
+                  </label>
                  <label htmlFor={`${id}-amount`} style={{ display: "grid", gap: 4, color: "var(--muted)", fontSize: 11 }}>
                    {t("settings.subscriptionAmount")}
                     <input id={`${id}-amount`} type="number" min="0.01" step="0.01" value={subscription.amount || ""} disabled={isPersistedVersion} onChange={event => updateSubscription({ amount: Number(event.target.value) })} style={{ minWidth: 0, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "7px 8px", color: "var(--text)" }} />
@@ -598,10 +603,12 @@ export function SettingsModal({ settings, projects, dataMode, onDataModeChange, 
            <button type="button" onClick={() => {
              const now = new Date();
              const effectiveFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-              set({ fixedSubscriptions: [...s.fixedSubscriptions, { id: `subscription-${nextSubscriptionId.current}`, provider: "", amount: 0, period: "monthly", models: [], effectiveFrom, effectiveTo: null }] });
+               set({ fixedSubscriptions: [...s.fixedSubscriptions, { id: `subscription-${nextSubscriptionId.current}`, provider: "", name: "", amount: 0, period: "monthly", models: [], effectiveFrom, effectiveTo: null }] });
              setSubscriptionIds(current => [...current, `subscription-${nextSubscriptionId.current++}`]);
            }} style={{ border: "1px dashed var(--border)", borderRadius: 8, padding: "6px 12px", background: "none", color: "var(--control-text)", cursor: "pointer" }}>{t("settings.addSubscription")}</button>
-             </section></>}
+              </section>
+              <SubscriptionComparison subscriptions={s.fixedSubscriptions} />
+              </>}
           </section>}
 
           {activeSection === "general" && <section id="settings-general" className="settings-section">

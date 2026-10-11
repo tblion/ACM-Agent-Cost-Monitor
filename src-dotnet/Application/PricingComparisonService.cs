@@ -15,6 +15,12 @@ internal sealed class PricingComparisonService : IDisposable
         ("anthropic", "anthropic-official", "Anthropic (official)", new Uri("https://platform.claude.com/docs/en/about-claude/pricing")),
         ("google", "google-official", "Google Gemini API (official)", new Uri("https://ai.google.dev/gemini-api/docs/pricing")),
     ];
+    private static readonly (string Provider, string SourceId, string Name, Uri Url)[] SubscriptionSources =
+    [
+        ("openai", "openai-subscription", "OpenAI (official)", new Uri("https://chatgpt.com/pricing/")),
+        ("anthropic", "anthropic-subscription", "Anthropic (official)", new Uri("https://claude.com/pricing")),
+        ("google", "google-subscription", "Google AI plans (official)", new Uri("https://one.google.com/intl/en_us/about/google-ai-plans/")),
+    ];
     private static readonly Uri LiteLlmPricing = new("https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json");
     private readonly HttpClient _httpClient;
 
@@ -47,6 +53,17 @@ internal sealed class PricingComparisonService : IDisposable
             sources.Add(await ReadSourceAsync(
                 "litellm", "aggregator", "LiteLLM (community-maintained)", LiteLlmPricing,
                 uri => ParseLiteLlmAsync(uri, keys, retrievedAt, cancellationToken), cancellationToken));
+        }
+
+        foreach (var source in SubscriptionSources.Where(source => keys.Any(key => key.Kind == "subscription"
+                     && key.Provider.Equals(source.Provider, StringComparison.OrdinalIgnoreCase))))
+        {
+            var offers = keys.Where(key => key.Kind == "subscription"
+                && key.Provider.Equals(source.Provider, StringComparison.OrdinalIgnoreCase)).Select(key => key.Model)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            sources.Add(await ReadSourceAsync(
+                source.SourceId, "official", source.Name, source.Url,
+                uri => ParseSubscriptionAsync(uri, source, offers, retrievedAt, cancellationToken), cancellationToken));
         }
 
         if (IsE2ePricingEnabled())
@@ -166,6 +183,64 @@ internal sealed class PricingComparisonService : IDisposable
         return result;
     }
 
+    private async Task<IReadOnlyList<PricingCandidate>> ParseSubscriptionAsync(
+        Uri uri,
+        (string Provider, string SourceId, string Name, Uri Url) source,
+        IReadOnlyList<string> offers,
+        DateTimeOffset retrievedAt,
+        CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(uri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.Content.Headers.ContentType?.MediaType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            using var document = JsonDocument.Parse(content);
+            if (!document.RootElement.TryGetProperty("candidates", out var candidates)) return [];
+            return candidates.EnumerateArray().Where(item => offers.Any(offer =>
+                    offer.Equals(item.GetProperty("model").GetString(), StringComparison.OrdinalIgnoreCase)))
+                .Select(item => new PricingCandidate(
+                    source.SourceId, "official", source.Name, uri.ToString(), retrievedAt,
+                    item.TryGetProperty("effectiveFrom", out var effectiveFrom) ? effectiveFrom.GetString() : null,
+                    source.Provider, item.GetProperty("model").GetString()!,
+                    item.TryGetProperty("region", out var region) ? region.GetString() : null,
+                    item.TryGetProperty("currency", out var currency) ? currency.GetString() ?? "UNKNOWN" : "UNKNOWN",
+                    item.TryGetProperty("unit", out var unit) ? unit.GetString() ?? "period unknown" : "period unknown",
+                    ReadNullableNumber(item, "amount"), null, null, null, "ambiguous",
+                    ["Official source", "Region not specified", "Tax inclusion not specified"]))
+                .ToArray();
+        }
+        var text = WebUtility.HtmlDecode(Regex.Replace(content, "<[^>]+>", " "));
+        var result = new List<PricingCandidate>();
+        foreach (var offer in offers)
+        {
+            var index = text.IndexOf(offer, StringComparison.OrdinalIgnoreCase);
+            if (index < 0) continue;
+            var excerpt = text[index..Math.Min(text.Length, index + 600)];
+            var price = Regex.Match(excerpt,
+                @"(?<currency>USD|EUR|GBP|CAD|AUD|\$|€|£)\s*(?<amount>\d+(?:\.\d{1,2})?)\s*(?:/|per)\s*(?<period>month|monthly|year|annual|annually)",
+                RegexOptions.IgnoreCase);
+            if (!price.Success) continue;
+            var currency = price.Groups["currency"].Value.ToUpperInvariant() switch
+            {
+                "€" => "EUR",
+                "£" => "GBP",
+                "$" => "USD",
+                var code => code,
+            };
+            var period = price.Groups["period"].Value.StartsWith("m", StringComparison.OrdinalIgnoreCase) ? "monthly" : "annual";
+            var ambiguousCurrency = price.Groups["currency"].Value is "$";
+            result.Add(new PricingCandidate(
+                source.SourceId, "official", source.Name, uri.ToString(), retrievedAt, null,
+                source.Provider, offer, null, currency, period,
+                double.Parse(price.Groups["amount"].Value, CultureInfo.InvariantCulture), null, null, null,
+                "ambiguous",
+                ["Official source", "Region not specified", "Tax inclusion not specified",
+                    .. (ambiguousCurrency ? new[] { "Currency symbol does not identify a country" } : Array.Empty<string>())]));
+        }
+        return result;
+    }
+
     private async Task<IReadOnlyList<PricingCandidate>> FetchFailedFixtureAsync(CancellationToken cancellationToken)
     {
         var uri = ResolveUri("failed-source", new Uri("http://127.0.0.1/"));
@@ -210,6 +285,9 @@ internal sealed class PricingComparisonService : IDisposable
             "openai-official" => "OPENCODE_COSTS_PRICING_OFFICIAL_URL",
             "anthropic-official" => "OPENCODE_COSTS_PRICING_OFFICIAL_URL",
             "google-official" => "OPENCODE_COSTS_PRICING_OFFICIAL_URL",
+            "openai-subscription" => "OPENCODE_COSTS_PRICING_SUBSCRIPTION_URL",
+            "anthropic-subscription" => "OPENCODE_COSTS_PRICING_SUBSCRIPTION_URL",
+            "google-subscription" => "OPENCODE_COSTS_PRICING_SUBSCRIPTION_URL",
             "litellm" => "OPENCODE_COSTS_PRICING_AGGREGATOR_URL",
             "failed-source" => "OPENCODE_COSTS_PRICING_FAILED_SOURCE_URL",
             _ => throw new InvalidOperationException("Unknown pricing source."),
@@ -232,7 +310,7 @@ internal sealed class PricingComparisonService : IDisposable
     private static void ValidateKeys(IReadOnlyList<PricingLookupKey> keys)
     {
         if (keys.Count is 0 or > 100) throw new ArgumentException("Provide between 1 and 100 pricing lookup keys.");
-        if (keys.Any(key => key.Kind != "usage" || string.IsNullOrWhiteSpace(key.Provider)
+        if (keys.Any(key => key.Kind is not ("usage" or "subscription") || string.IsNullOrWhiteSpace(key.Provider)
             || string.IsNullOrWhiteSpace(key.Model) || key.Provider.Length > 100 || key.Model.Length > 200))
             throw new ArgumentException("Only bounded usage provider/model identifiers are supported.");
     }

@@ -242,6 +242,29 @@ test("compares pricing sources and applies only the explicitly confirmed candida
     .resolves.toEqual([expect.objectContaining({ provider: "OpenAI", model: "gpt-4.1", input: 2.1, output: 8.2 })]);
 });
 
+test("compares public subscription prices without changing the amount actually paid", async ({ page }) => {
+  await page.goto("/?e2e=subscription-comparison");
+  await page.getByRole("button", { name: "Réglages" }).click();
+  const settingsPage = page.locator(".settings-page");
+  await settingsPage.getByRole("button", { name: "Tarifs" }).click();
+  await settingsPage.getByRole("button", { name: "Abonnements" }).click();
+
+  await expect(settingsPage.getByRole("textbox", { name: "Formule ou offre" })).toHaveValue("Plus");
+  await expect(settingsPage.getByRole("spinbutton", { name: "Montant payé (USD)" })).toHaveValue("30");
+  await settingsPage.getByRole("button", { name: "Comparer les prix publics" }).click();
+  const comparison = settingsPage.getByRole("region", { name: "Comparaison des offres publiques" });
+  await expect(comparison).toContainText("OpenAI (official)");
+  await expect(comparison).toContainText("20 USD / monthly");
+  await expect(comparison).toContainText("Taxes non précisées");
+  await expect(comparison).toContainText(/région non précisée/i);
+  await expect(settingsPage.getByRole("spinbutton", { name: "Montant payé (USD)" })).toHaveValue("30");
+  await expect(comparison.getByRole("button", { name: /Appliquer|Remplacer/ })).toHaveCount(0);
+  await expect(page.evaluate(async () => {
+    const api = await import("/src/api.ts");
+    return (await api.getSettings()).fixedSubscriptions[0].amount;
+  })).resolves.toBe(30);
+});
+
 test("creates a new version from a catalog rate and can restore that reference", async ({ page }) => {
   await page.goto("/?e2e=catalog-rate-editor");
   const reference = await page.evaluate(async () => (await (await import("/src/api.ts")).getCatalogRates())[0]);

@@ -14,6 +14,7 @@ export interface CustomGroup { name: string; projects: string[]; }
 export interface FixedSubscription {
   id: string;
   provider: string;
+  name?: string;
   amount: number;
   period: "monthly" | "annual";
   models: string[];
