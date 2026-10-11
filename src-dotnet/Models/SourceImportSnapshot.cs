@@ -3,7 +3,13 @@ namespace OpencodeCostsViewer.Backend.Models;
 
 internal sealed record SourceImportSnapshot(
     IReadOnlyList<SourceSessionRow> Sessions,
-    IReadOnlyList<SourceMessageRow> Messages);
+    IReadOnlyList<SourceMessageRow> Messages,
+    long? LastSourceTimestamp = null,
+    IReadOnlyDictionary<string, long>? SessionWatermarks = null);
+
+internal sealed record SourceImportState(
+    long? LastSourceTimestamp,
+    IReadOnlyDictionary<string, long> SessionWatermarks);
 
 internal sealed record SourceSessionRow(
     string SessionId,

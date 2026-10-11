@@ -10,7 +10,10 @@ internal static class OpencodeApi
 {
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
 
-    public static async Task<SourceImportSnapshot> LoadImportSnapshotAsync(CancellationToken cancellationToken)
+    public static async Task<SourceImportSnapshot> LoadImportSnapshotAsync(
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? sessionWatermarks = null,
+        bool fullReimport = false)
     {
         var servicePath = PathResolver.OpenCodeServiceStatePath();
         if (!File.Exists(servicePath))
@@ -30,19 +33,13 @@ internal static class OpencodeApi
         var authorization = string.IsNullOrEmpty(password)
             ? null
             : new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"opencode:{password}")));
-        using var activeRequest = CreateRequest(serviceUri, "/api/session/active", authorization);
-        using var activeResponse = await Client.SendAsync(activeRequest, cancellationToken);
-        activeResponse.EnsureSuccessStatusCode();
-        using var activeDocument = JsonDocument.Parse(await activeResponse.Content.ReadAsStringAsync(cancellationToken));
-        if (!TryGetObject(activeDocument.RootElement, "data", out var activeSessions))
-            throw new InvalidDataException("La réponse OpenCode ne contient pas les sessions actives.");
-
+        var activeSessions = await LoadSessionsAsync(serviceUri, authorization, cancellationToken, fullReimport);
         var sessions = new List<SourceSessionRow>();
         var messages = new Dictionary<string, SourceMessageRow>(StringComparer.Ordinal);
-        foreach (var active in activeSessions.EnumerateObject())
+        var importedWatermarks = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var id in activeSessions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var id = active.Name;
             if (string.IsNullOrWhiteSpace(id)) continue;
             using var sessionRequest = CreateRequest(serviceUri, $"/api/session/{Uri.EscapeDataString(id)}", authorization);
             using var sessionResponse = await Client.SendAsync(sessionRequest, cancellationToken);
@@ -58,10 +55,18 @@ internal static class OpencodeApi
                 NullIfEmpty(ReadString(session, "parentID")),
                 ReadLong(time, "created") ?? 0));
 
+            var previousWatermark = 0L;
+            var hasPreviousWatermark = !fullReimport
+                && sessionWatermarks is not null
+                && sessionWatermarks.TryGetValue(id, out previousWatermark);
+            long? latestTimestamp = null;
             string? cursor = null;
+            var reachedWatermark = false;
             do
             {
-                var query = cursor is null ? "?limit=100&order=asc" : $"?limit=100&cursor={Uri.EscapeDataString(cursor)}";
+                var query = cursor is null
+                    ? "?limit=100&order=desc"
+                    : $"?limit=100&cursor={Uri.EscapeDataString(cursor)}";
                 using var messagesRequest = CreateRequest(serviceUri,
                     $"/api/session/{Uri.EscapeDataString(id)}/message{query}", authorization);
                 using var messagesResponse = await Client.SendAsync(messagesRequest, cancellationToken);
@@ -79,6 +84,13 @@ internal static class OpencodeApi
                     var created = TryGetObject(info, "time", out var messageTime)
                         ? ReadLong(messageTime, "created")
                         : null;
+                    if (created is { } timestamp && (latestTimestamp is null || timestamp > latestTimestamp))
+                        latestTimestamp = timestamp;
+                    if (hasPreviousWatermark && created is { } messageTimestamp && messageTimestamp < previousWatermark)
+                    {
+                        reachedWatermark = true;
+                        continue;
+                    }
                     var role = FirstNonEmpty(ReadString(info, "type"), ReadString(info, "role"));
                     var tokens = ReadTokens(info);
                     messages[messageId] = new SourceMessageRow(
@@ -95,10 +107,56 @@ internal static class OpencodeApi
                     ? ReadString(pageCursor, "next")
                     : string.Empty;
             }
-            while (!string.IsNullOrWhiteSpace(cursor));
+            while (!reachedWatermark && !string.IsNullOrWhiteSpace(cursor));
+            if (latestTimestamp is { } importedAt) importedWatermarks[id] = importedAt;
         }
 
-        return new SourceImportSnapshot(sessions, messages.Values.ToArray());
+        return new SourceImportSnapshot(sessions, messages.Values.ToArray(), SessionWatermarks: importedWatermarks);
+    }
+
+    private static async Task<IReadOnlyList<string>> LoadSessionsAsync(
+        Uri serviceUri,
+        AuthenticationHeaderValue? authorization,
+        CancellationToken cancellationToken,
+        bool fullReimport)
+    {
+        if (!fullReimport)
+        {
+            using var request = CreateRequest(serviceUri, "/api/session/active", authorization);
+            using var response = await Client.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            if (!TryGetObject(document.RootElement, "data", out var activeSessions))
+                throw new InvalidDataException("La réponse OpenCode ne contient pas les sessions actives.");
+            return activeSessions.EnumerateObject().Select(active => active.Name).ToArray();
+        }
+
+        var sessions = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        do
+        {
+            var query = cursor is null ? "?limit=100" : $"?limit=100&cursor={Uri.EscapeDataString(cursor)}";
+            using var request = CreateRequest(serviceUri, $"/api/session{query}", authorization);
+            using var response = await Client.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            var data = document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("data", out var wrapped)
+                    ? wrapped
+                    : document.RootElement;
+            if (data.ValueKind != JsonValueKind.Array)
+                throw new InvalidDataException("La réponse OpenCode ne contient pas une liste de sessions.");
+            foreach (var session in data.EnumerateArray())
+            {
+                var id = ReadString(session, "id");
+                if (!string.IsNullOrWhiteSpace(id)) sessions.Add(id);
+            }
+            cursor = TryGetObject(document.RootElement, "cursor", out var pageCursor)
+                ? ReadString(pageCursor, "next")
+                : string.Empty;
+        }
+        while (!string.IsNullOrWhiteSpace(cursor));
+        return sessions.ToArray();
     }
 
     private static HttpRequestMessage CreateRequest(Uri serviceUri, string path, AuthenticationHeaderValue? authorization)

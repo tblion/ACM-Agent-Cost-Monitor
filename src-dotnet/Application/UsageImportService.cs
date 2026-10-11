@@ -12,7 +12,7 @@ internal interface IUsageSourceAdapter
     string AgentId { get; }
     string AgentName { get; }
     string SourceKey { get; }
-    SourceImportSnapshot ReadSnapshot(string sourcePath);
+    SourceImportSnapshot ReadSnapshot(string sourcePath, long? since, bool fullReimport);
 }
 
 internal sealed class OpenCodeSourceAdapter : IUsageSourceAdapter
@@ -20,7 +20,8 @@ internal sealed class OpenCodeSourceAdapter : IUsageSourceAdapter
     public string AgentId => "opencode";
     public string AgentName => "OpenCode";
     public string SourceKey => "default";
-    public SourceImportSnapshot ReadSnapshot(string sourcePath) => OpencodeDatabase.LoadImportSnapshot(sourcePath);
+    public SourceImportSnapshot ReadSnapshot(string sourcePath, long? since, bool fullReimport) =>
+        OpencodeDatabase.LoadImportSnapshot(sourcePath, since, fullReimport);
 }
 
 internal static class UsageImportService
@@ -36,35 +37,37 @@ internal static class UsageImportService
         SyncOpenCode(sourcePath);
     }
 
-    public static void SyncOpenCode(string sourcePath)
+    public static void SyncOpenCode(string sourcePath, bool fullReimport = false)
     {
         var adapter = new OpenCodeSourceAdapter();
+        var importState = InternalDatabase.GetImportState(adapter.AgentId, adapter.SourceKey, "database");
         SourceImportSnapshot snapshot;
         try
         {
-            snapshot = adapter.ReadSnapshot(sourcePath);
+            snapshot = adapter.ReadSnapshot(sourcePath, importState.LastSourceTimestamp, fullReimport);
             Log.Information("Read {SessionCount} sessions and {MessageCount} messages from {Agent}",
                 snapshot.Sessions.Count, snapshot.Messages.Count, adapter.AgentName);
         }
         catch (SqliteException exception)
         {
-            if (CanUseImportedData(adapter, sourcePath, exception)) return;
+            if (!fullReimport && CanUseImportedData(adapter, sourcePath, exception)) return;
             throw SourceReadError(exception);
         }
         catch (InvalidDataException exception)
         {
-            if (CanUseImportedData(adapter, sourcePath, exception)) return;
+            if (!fullReimport && CanUseImportedData(adapter, sourcePath, exception)) return;
             throw SourceReadError(exception);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            if (CanUseImportedData(adapter, sourcePath, exception)) return;
+            if (!fullReimport && CanUseImportedData(adapter, sourcePath, exception)) return;
             throw SourceReadError(exception);
         }
 
         try
         {
-            InternalDatabase.ImportSource(adapter.AgentId, adapter.AgentName, adapter.SourceKey, sourcePath, snapshot);
+            InternalDatabase.ImportSource(adapter.AgentId, adapter.AgentName, adapter.SourceKey, sourcePath, snapshot,
+                fullReimport: fullReimport);
             Log.Information("Imported {Agent} source into the internal usage database", adapter.AgentName);
         }
         catch (SqliteException exception)
@@ -77,7 +80,7 @@ internal static class UsageImportService
         }
     }
 
-    public static async Task SyncOpenCodeApiAsync(CancellationToken cancellationToken)
+    public static async Task SyncOpenCodeApiAsync(CancellationToken cancellationToken, bool fullReimport = false)
     {
         await ApiSyncGate.WaitAsync(cancellationToken);
         try
@@ -86,8 +89,11 @@ internal static class UsageImportService
         var sourcePath = SettingsService.ResolvePaths(SettingsService.LoadForCommands()).Db;
         try
         {
-            var snapshot = await OpencodeApi.LoadImportSnapshotAsync(cancellationToken);
-            InternalDatabase.ImportSource("opencode", "OpenCode", "default", sourcePath, snapshot, "api", channelPath);
+            var importState = InternalDatabase.GetImportState("opencode", "default", "api");
+            var snapshot = await OpencodeApi.LoadImportSnapshotAsync(
+                cancellationToken, importState.SessionWatermarks, fullReimport);
+            InternalDatabase.ImportSource("opencode", "OpenCode", "default", sourcePath, snapshot,
+                "api", channelPath, fullReimport);
             Log.Information("Imported OpenCode API snapshot: {SessionCount} sessions and {MessageCount} messages",
                 snapshot.Sessions.Count, snapshot.Messages.Count);
         }
@@ -112,6 +118,39 @@ internal static class UsageImportService
         finally
         {
             ApiSyncGate.Release();
+        }
+    }
+
+    public static async Task ReimportAllAsync(CancellationToken cancellationToken)
+    {
+        var settings = SettingsService.LoadForCommands();
+        List<Exception> failures = [];
+        try
+        {
+            SyncOpenCode(SettingsService.ResolvePaths(settings).Db, fullReimport: true);
+        }
+        catch (BackendException exception)
+        {
+            failures.Add(exception);
+        }
+
+        if (File.Exists(PathResolver.OpenCodeServiceStatePath()))
+        {
+            try
+            {
+                await SyncOpenCodeApiAsync(cancellationToken, fullReimport: true);
+            }
+            catch (BackendException exception)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new BackendException("integration",
+                $"Le réimport complet a rencontré des erreurs: {string.Join("; ", failures.Select(error => error.Message))}",
+                new AggregateException(failures));
         }
     }
 

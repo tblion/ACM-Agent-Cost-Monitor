@@ -12,10 +12,15 @@ internal static class OpencodeDatabase
         FROM session
         ORDER BY id
         """;
-
     private const string ImportMessagesQuery = """
         SELECT id, session_id, time_created, data
         FROM message
+        ORDER BY id
+        """;
+    private const string IncrementalMessagesQuery = """
+        SELECT id, session_id, time_created, data
+        FROM message
+        WHERE time_created >= $since
         ORDER BY id
         """;
 
@@ -24,14 +29,19 @@ internal static class OpencodeDatabase
         FROM session_v2
         ORDER BY id
         """;
-
     private const string ImportMessagesV2Query = """
         SELECT id, session_id, type, time_created, data
         FROM session_message
         ORDER BY id
         """;
+    private const string IncrementalMessagesV2Query = """
+        SELECT id, session_id, type, time_created, data
+        FROM session_message
+        WHERE time_created >= $since
+        ORDER BY id
+        """;
 
-    public static SourceImportSnapshot LoadImportSnapshot(string databasePath)
+    public static SourceImportSnapshot LoadImportSnapshot(string databasePath, long? since, bool fullReimport)
     {
         using var connection = OpenReadOnly(databasePath);
         using var transaction = connection.BeginTransaction(deferred: true);
@@ -46,6 +56,7 @@ internal static class OpencodeDatabase
 
         var sessionsById = new Dictionary<string, SourceSessionRow>(StringComparer.Ordinal);
         var messagesById = new Dictionary<string, SourceMessageRow>(StringComparer.Ordinal);
+        var readSince = fullReimport ? null : since;
         if (hasVersionOneTables)
         {
             foreach (var session in ReadSessionRows(connection, transaction))
@@ -53,7 +64,7 @@ internal static class OpencodeDatabase
                 sessionsById[session.SessionId] = new SourceSessionRow(
                     session.SessionId, session.Project, session.Title, session.ParentId, session.Date);
             }
-            foreach (var message in ReadImportMessages(connection, transaction))
+            foreach (var message in ReadImportMessages(connection, transaction, readSince))
             {
                 messagesById[message.MessageId] = message;
             }
@@ -66,7 +77,7 @@ internal static class OpencodeDatabase
                 sessionsById[session.SessionId] = new SourceSessionRow(
                     session.SessionId, session.Project, session.Title, session.ParentId, session.Date);
             }
-            foreach (var message in ReadImportMessagesV2(connection, transaction))
+            foreach (var message in ReadImportMessagesV2(connection, transaction, readSince))
             {
                 messagesById[message.MessageId] = message;
             }
@@ -74,8 +85,13 @@ internal static class OpencodeDatabase
 
         var sessions = sessionsById.Values.OrderBy(session => session.SessionId, StringComparer.Ordinal).ToArray();
         var messages = messagesById.Values.OrderBy(message => message.MessageId, StringComparer.Ordinal).ToArray();
+        var sourceTimestamps = messagesById.Values
+            .Where(message => message.MessageDate.HasValue)
+            .Select(message => message.MessageDate!.Value)
+            .ToArray();
         transaction.Commit();
-        return new SourceImportSnapshot(sessions, messages);
+        return new SourceImportSnapshot(sessions, messages,
+            sourceTimestamps.Length == 0 ? null : sourceTimestamps.Max());
     }
 
     private static bool TableExists(SqliteConnection connection, SqliteTransaction transaction, string tableName)
@@ -131,11 +147,13 @@ internal static class OpencodeDatabase
 
     private static List<SourceMessageRow> ReadImportMessages(
         SqliteConnection connection,
-        SqliteTransaction transaction)
+        SqliteTransaction transaction,
+        long? since)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = ImportMessagesQuery;
+        command.CommandText = since is null ? ImportMessagesQuery : IncrementalMessagesQuery;
+        if (since is { } timestamp) command.Parameters.AddWithValue("$since", timestamp);
         using var reader = command.ExecuteReader();
         var rows = new List<SourceMessageRow>();
         while (reader.Read())
@@ -171,11 +189,13 @@ internal static class OpencodeDatabase
 
     private static List<SourceMessageRow> ReadImportMessagesV2(
         SqliteConnection connection,
-        SqliteTransaction transaction)
+        SqliteTransaction transaction,
+        long? since)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = ImportMessagesV2Query;
+        command.CommandText = since is null ? ImportMessagesV2Query : IncrementalMessagesV2Query;
+        if (since is { } timestamp) command.Parameters.AddWithValue("$since", timestamp);
         using var reader = command.ExecuteReader();
         var rows = new List<SourceMessageRow>();
         while (reader.Read())

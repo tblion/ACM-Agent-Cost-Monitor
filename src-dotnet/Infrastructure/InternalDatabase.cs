@@ -8,7 +8,7 @@ namespace OpencodeCostsViewer.Backend.Infrastructure;
 
 internal static class InternalDatabase
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private const int ApplicationId = 1_414_284_359;
     private const string UnknownProjectId = "acm:unknown-project";
     private const string UnknownProjectName = "Inconnu";
@@ -34,9 +34,18 @@ internal static class InternalDatabase
             channel_key TEXT NOT NULL,
             channel_path TEXT NOT NULL,
             last_imported_at TEXT,
+            last_source_timestamp INTEGER,
             last_sync_attempt_at TEXT NOT NULL,
             last_sync_error TEXT,
             PRIMARY KEY(source_id, channel_key)
+        );
+        CREATE TABLE source_channel_watermarks (
+            source_id TEXT NOT NULL,
+            channel_key TEXT NOT NULL,
+            session_external_id TEXT NOT NULL,
+            last_message_timestamp INTEGER NOT NULL,
+            PRIMARY KEY(source_id, channel_key, session_external_id),
+            FOREIGN KEY(source_id, channel_key) REFERENCES source_channels(source_id, channel_key)
         );
         CREATE TABLE providers (
             provider_id TEXT PRIMARY KEY,
@@ -97,7 +106,8 @@ internal static class InternalDatabase
         string sourcePath,
         SourceImportSnapshot snapshot,
         string channelKey = "database",
-        string? channelPath = null)
+        string? channelPath = null,
+        bool fullReimport = false)
     {
         var fullSourcePath = Path.GetFullPath(sourcePath);
         var fullChannelPath = Path.GetFullPath(channelPath ?? sourcePath);
@@ -123,15 +133,23 @@ internal static class InternalDatabase
             ("$id", sourceId), ("$agent", agentId), ("$key", sourceKey), ("$path", fullSourcePath),
             ("$created", importedAt), ("$imported", importedAt));
         Execute(connection, transaction, """
-            INSERT INTO source_channels(source_id, channel_key, channel_path, last_imported_at, last_sync_attempt_at, last_sync_error)
-            VALUES($source, $channel, $path, $imported, $imported, NULL)
+            INSERT INTO source_channels(source_id, channel_key, channel_path, last_imported_at, last_source_timestamp, last_sync_attempt_at, last_sync_error)
+            VALUES($source, $channel, $path, $imported, $sourceTimestamp, $imported, NULL)
             ON CONFLICT(source_id, channel_key) DO UPDATE SET
                 channel_path = excluded.channel_path,
                 last_imported_at = excluded.last_imported_at,
+                last_source_timestamp = CASE
+                    WHEN $fullReimport = 1 THEN excluded.last_source_timestamp
+                    WHEN excluded.last_source_timestamp IS NULL THEN source_channels.last_source_timestamp
+                    WHEN source_channels.last_source_timestamp IS NULL OR excluded.last_source_timestamp > source_channels.last_source_timestamp
+                        THEN excluded.last_source_timestamp
+                    ELSE source_channels.last_source_timestamp END,
                 last_sync_attempt_at = excluded.last_sync_attempt_at,
                 last_sync_error = NULL
             """,
-            ("$source", sourceId), ("$channel", channelKey), ("$path", fullChannelPath), ("$imported", importedAt));
+            ("$source", sourceId), ("$channel", channelKey), ("$path", fullChannelPath),
+            ("$imported", importedAt), ("$sourceTimestamp", DbValue(snapshot.LastSourceTimestamp)),
+            ("$fullReimport", fullReimport ? 1 : 0));
         if (agentId == "opencode" && channelKey == "database")
         {
             Execute(connection, transaction, """
@@ -211,6 +229,24 @@ internal static class InternalDatabase
                 ("$input", DbValue(message.Tokens?.Input)), ("$output", DbValue(message.Tokens?.Output)),
                 ("$cacheRead", DbValue(message.Tokens?.CacheRead)), ("$cacheWrite", DbValue(message.Tokens?.CacheWrite)),
                 ("$reasoning", DbValue(message.Tokens?.Reasoning)));
+        }
+
+        if (fullReimport)
+        {
+            Execute(connection, transaction,
+                "DELETE FROM source_channel_watermarks WHERE source_id = $source AND channel_key = $channel",
+                ("$source", sourceId), ("$channel", channelKey));
+        }
+
+        foreach (var (sessionId, timestamp) in snapshot.SessionWatermarks ?? new Dictionary<string, long>())
+        {
+            Execute(connection, transaction, """
+                INSERT INTO source_channel_watermarks(source_id, channel_key, session_external_id, last_message_timestamp)
+                VALUES($source, $channel, $session, $timestamp)
+                ON CONFLICT(source_id, channel_key, session_external_id) DO UPDATE SET
+                    last_message_timestamp = MAX(source_channel_watermarks.last_message_timestamp, excluded.last_message_timestamp)
+                """,
+                ("$source", sourceId), ("$channel", channelKey), ("$session", sessionId), ("$timestamp", timestamp));
         }
 
         transaction.Commit();
@@ -358,6 +394,34 @@ internal static class InternalDatabase
 
     public static string SourceIdFor(string agentId, string sourceKey) => CreateSourceId(agentId, sourceKey);
 
+    public static SourceImportState GetImportState(string agentId, string sourceKey, string channelKey)
+    {
+        var sourceId = CreateSourceId(agentId, sourceKey);
+        using var connection = Open(DatabasePath);
+        long? lastSourceTimestamp;
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT last_source_timestamp FROM source_channels WHERE source_id = $source AND channel_key = $channel";
+            command.Parameters.AddWithValue("$source", sourceId);
+            command.Parameters.AddWithValue("$channel", channelKey);
+            var result = command.ExecuteScalar();
+            lastSourceTimestamp = result is null or DBNull
+                ? null
+                : Convert.ToInt64(result, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var sessionWatermarks = new Dictionary<string, long>(StringComparer.Ordinal);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT session_external_id, last_message_timestamp FROM source_channel_watermarks WHERE source_id = $source AND channel_key = $channel";
+            command.Parameters.AddWithValue("$source", sourceId);
+            command.Parameters.AddWithValue("$channel", channelKey);
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) sessionWatermarks[reader.GetString(0)] = reader.GetInt64(1);
+        }
+        return new SourceImportState(lastSourceTimestamp, sessionWatermarks);
+    }
+
     public static void RecordSyncFailure(string agentId, string agentName, string sourceKey, string sourcePath, string error)
     {
         var fullSourcePath = Path.GetFullPath(sourcePath);
@@ -495,7 +559,17 @@ internal static class InternalDatabase
                     "SELECT COUNT(*) FROM restore_source.sqlite_master WHERE type='table' AND name='source_channels'"),
                     System.Globalization.CultureInfo.InvariantCulture) > 0;
                 if (backupHasChannels)
-                    Execute(connection, transaction, "INSERT OR IGNORE INTO source_channels SELECT * FROM restore_source.source_channels");
+                {
+                    var backupHasSourceTimestamp = AttachedTableHasColumn(connection, transaction,
+                        "source_channels", "last_source_timestamp");
+                    var sourceTimestamp = backupHasSourceTimestamp ? ", last_source_timestamp" : string.Empty;
+                    Execute(connection, transaction, $"""
+                        INSERT OR IGNORE INTO source_channels(
+                            source_id, channel_key, channel_path, last_imported_at{sourceTimestamp}, last_sync_attempt_at, last_sync_error)
+                        SELECT source_id, channel_key, channel_path, last_imported_at{sourceTimestamp}, last_sync_attempt_at, last_sync_error
+                        FROM restore_source.source_channels
+                        """);
+                }
                 else
                     Execute(connection, transaction, """
                         INSERT OR IGNORE INTO source_channels(source_id, channel_key, channel_path, last_imported_at, last_sync_attempt_at, last_sync_error)
@@ -507,6 +581,11 @@ internal static class InternalDatabase
                 Execute(connection, transaction, "INSERT OR IGNORE INTO projects SELECT * FROM restore_source.projects");
                 Execute(connection, transaction, "INSERT OR IGNORE INTO sessions SELECT * FROM restore_source.sessions");
                 Execute(connection, transaction, "INSERT OR IGNORE INTO messages SELECT * FROM restore_source.messages");
+                var backupHasWatermarks = Convert.ToInt32(Scalar(connection, transaction,
+                    "SELECT COUNT(*) FROM restore_source.sqlite_master WHERE type='table' AND name='source_channel_watermarks'"),
+                    System.Globalization.CultureInfo.InvariantCulture) > 0;
+                if (backupHasWatermarks)
+                    Execute(connection, transaction, "INSERT OR IGNORE INTO source_channel_watermarks SELECT * FROM restore_source.source_channel_watermarks");
                 transaction.Commit();
             }
 
@@ -567,7 +646,7 @@ internal static class InternalDatabase
         var applicationId = Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         command.CommandText = "PRAGMA restore_source.user_version";
         var schemaVersion = Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
-        if (applicationId != ApplicationId || schemaVersion is not (1 or SchemaVersion))
+        if (applicationId != ApplicationId || schemaVersion is not (1 or 2 or SchemaVersion))
         {
             throw new InvalidDataException("Cette sauvegarde n'est pas compatible avec la version actuelle de la base interne.");
         }
@@ -577,6 +656,23 @@ internal static class InternalDatabase
         {
             throw new InvalidDataException("La sauvegarde ne contient pas le schéma interne attendu.");
         }
+    }
+
+    private static bool AttachedTableHasColumn(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string tableName,
+        string columnName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"PRAGMA restore_source.table_info({tableName})";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.Ordinal)) return true;
+        }
+        return false;
     }
 
     private static SqliteConnection Open(string path, bool pooling = true)
@@ -643,13 +739,43 @@ internal static class InternalDatabase
                     channel_key TEXT NOT NULL,
                     channel_path TEXT NOT NULL,
                     last_imported_at TEXT,
+                    last_source_timestamp INTEGER,
                     last_sync_attempt_at TEXT NOT NULL,
                     last_sync_error TEXT,
                     PRIMARY KEY(source_id, channel_key)
                 );
-                INSERT INTO source_channels(source_id, channel_key, channel_path, last_imported_at, last_sync_attempt_at, last_sync_error)
-                SELECT source_id, 'database', source_path, last_imported_at, last_sync_attempt_at, last_sync_error FROM data_sources;
-                PRAGMA user_version = 2;
+                INSERT INTO source_channels(source_id, channel_key, channel_path, last_imported_at, last_source_timestamp, last_sync_attempt_at, last_sync_error)
+                SELECT source_id, 'database', source_path, last_imported_at, NULL, last_sync_attempt_at, last_sync_error FROM data_sources;
+                CREATE TABLE source_channel_watermarks (
+                    source_id TEXT NOT NULL,
+                    channel_key TEXT NOT NULL,
+                    session_external_id TEXT NOT NULL,
+                    last_message_timestamp INTEGER NOT NULL,
+                    PRIMARY KEY(source_id, channel_key, session_external_id),
+                    FOREIGN KEY(source_id, channel_key) REFERENCES source_channels(source_id, channel_key)
+                );
+                PRAGMA user_version = 3;
+                """;
+            command.ExecuteNonQuery();
+            transaction.Commit();
+            return;
+        }
+
+        if (applicationId == ApplicationId && version == 2)
+        {
+            using var transaction = connection.BeginTransaction(deferred: false);
+            command.Transaction = transaction;
+            command.CommandText = """
+                ALTER TABLE source_channels ADD COLUMN last_source_timestamp INTEGER;
+                CREATE TABLE source_channel_watermarks (
+                    source_id TEXT NOT NULL,
+                    channel_key TEXT NOT NULL,
+                    session_external_id TEXT NOT NULL,
+                    last_message_timestamp INTEGER NOT NULL,
+                    PRIMARY KEY(source_id, channel_key, session_external_id),
+                    FOREIGN KEY(source_id, channel_key) REFERENCES source_channels(source_id, channel_key)
+                );
+                PRAGMA user_version = 3;
                 """;
             command.ExecuteNonQuery();
             transaction.Commit();
